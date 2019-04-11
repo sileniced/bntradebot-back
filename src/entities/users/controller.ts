@@ -18,7 +18,7 @@ const cannotFindUserStr = 'Cannot find user'
 const unauthorizedUserStr = 'You\'re not this user'
 
 @JsonController()
-export default class UserController {
+class UserController {
 
   @Authorized('ROLE_ADMIN')
   @Get('/users')
@@ -73,3 +73,5 @@ export default class UserController {
     return user.remove()
   }
 }
+
+export default UserController

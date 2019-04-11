@@ -4,7 +4,7 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 import { BaseEntity } from 'typeorm/repository/BaseEntity'
 
 @Entity()
-export default class User extends BaseEntity {
+class User extends BaseEntity {
 
   @PrimaryGeneratedColumn()
   public id: number
@@ -15,10 +15,16 @@ export default class User extends BaseEntity {
   @Column('text', { nullable: false })
   public lastName: string
 
-  public fullName = (): string => this.firstName + ' ' + this.lastName
+  public fullName = (): string => `${this.firstName} ${this.lastName}`
 
   @Column('text', { nullable: false })
   public email: string
+
+  @Column('text', { nullable: true })
+  public binanceKey: string
+
+  @Column('text', { nullable: true })
+  public binanceSecret: string
 
   @Column('text', { nullable: true })
   @Exclude({ toPlainOnly: true })
@@ -32,3 +38,5 @@ export default class User extends BaseEntity {
     return bcrypt.compare(rawPassword, this.password)
   }
 }
+
+export default User

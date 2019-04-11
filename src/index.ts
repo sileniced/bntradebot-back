@@ -4,6 +4,7 @@ import { Server } from 'http'
 import * as Koa from 'koa'
 import * as IO from 'socket.io'
 import * as socketIoJwtAuth from 'socketio-jwt-auth'
+import Binance from 'binance-api-node'
 
 import setupDb from './db'
 import { verify } from './jwt'
@@ -12,10 +13,12 @@ import { secret } from './jwt'
 import User from './entities/users/entity'
 
 import LoginController from './logins/controller'
+import UserController from './entities/users/controller'
 
 const app = new Koa()
 const server = new Server(app.callback())
 export const io = IO(server)
+export const binance = Binance()
 
 const port = process.env.PORT || 4000
 
@@ -23,6 +26,7 @@ useKoaServer(app, {
   cors: true,
   controllers: [
     LoginController,
+    UserController,
   ],
   authorizationChecker: (action: Action) => {
     const header: string = action.request.headers.authorization
@@ -62,6 +66,15 @@ io.on('connect', socket => {
 
 setupDb()
 .then(() => {
-  server.listen(port, () => console!.log(`Listening on port ${port}`))
+  server.listen(port, () => {
+    binance.time().then(time => {
+      console!.log(`
+      Binance time: ${new Date(time)} 
+      Server  time: ${new Date()}
+      Listening on port ${port}
+      `)
+    })
+  })
 })
 .catch((err) => console!.error(err))
+

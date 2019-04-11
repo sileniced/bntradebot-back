@@ -3,7 +3,7 @@ import { CustomNamingStrategy } from './customNamingStrategy'
 
 import User from './entities/users/entity'
 
-export default () =>
+const db = () =>
   createConnection({
     entities: [
       User,
@@ -15,3 +15,5 @@ export default () =>
     url: process.env.DATABASE_URL || 'postgres://postgres:secret@localhost:5432/postgres'
   })
   .then(() => console!.log('Connected to Postgres with TypeORM'));
+
+export default db

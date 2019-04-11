@@ -5,7 +5,7 @@ import { AuthenticatePayload } from './authPayload'
 import User from '../entities/users/entity'
 
 @JsonController()
-export default class LoginController {
+class LoginController {
 
   @Post('/logins')
   public async authenticate(
@@ -18,3 +18,5 @@ export default class LoginController {
     return { jwt }
   }
 }
+
+export default LoginController
