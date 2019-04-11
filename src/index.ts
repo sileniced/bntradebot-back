@@ -10,10 +10,12 @@ import setupDb from './db'
 import { verify } from './jwt'
 import { secret } from './jwt'
 
+import HomeController from './controllers/HomeController'
 import LoginController from './logins/LoginController'
 import UserController from './controllers/UserController'
 
 import User from './entities/User'
+import PublicController from './controllers/Binance/PublicController'
 
 const app = new Koa()
 const server = new Server(app.callback())
@@ -25,8 +27,10 @@ const port = process.env.PORT || 4000
 useKoaServer(app, {
   cors: true,
   controllers: [
+    HomeController,
     LoginController,
     UserController,
+    PublicController
   ],
   authorizationChecker: (action: Action) => {
     const header: string = action.request.headers.authorization
