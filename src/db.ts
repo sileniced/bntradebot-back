@@ -1,7 +1,7 @@
 import { createConnection } from 'typeorm'
 import { CustomNamingStrategy } from './customNamingStrategy'
 
-import User from './entities/users/entity'
+import User from './entities/User'
 
 const db = () =>
   createConnection({

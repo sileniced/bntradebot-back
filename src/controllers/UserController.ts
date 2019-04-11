@@ -12,10 +12,10 @@ import {
   Put, UnauthorizedError
 } from 'routing-controllers'
 
-import User from './entity'
+import User from '../entities/User'
 
 const cannotFindUserStr = 'Cannot find user'
-const unauthorizedUserStr = 'You\'re not this user'
+const unauthorizedUserStr = `You're not this user`
 
 @JsonController()
 class UserController {

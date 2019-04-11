@@ -10,10 +10,10 @@ import setupDb from './db'
 import { verify } from './jwt'
 import { secret } from './jwt'
 
-import User from './entities/users/entity'
+import LoginController from './logins/LoginController'
+import UserController from './controllers/UserController'
 
-import LoginController from './logins/controller'
-import UserController from './entities/users/controller'
+import User from './entities/User'
 
 const app = new Koa()
 const server = new Server(app.callback())

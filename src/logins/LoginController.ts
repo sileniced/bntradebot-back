@@ -2,7 +2,7 @@ import { BadRequestError, Body, JsonController, Post } from 'routing-controllers
 import { sign } from '../jwt'
 import { AuthenticatePayload } from './authPayload'
 
-import User from '../entities/users/entity'
+import User from '../entities/User'
 
 @JsonController()
 class LoginController {
