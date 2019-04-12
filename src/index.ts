@@ -73,9 +73,8 @@ setupDb()
   server.listen(port, () => {
     binance.time().then(time => {
       console!.log(`
-      Binance time: ${new Date(time)} 
-      Server  time: ${new Date()}
-      Listening on port ${port}
+      Binance time diff: ${time - Date.now()}ms 
+      Listening on port ${port} 
       `)
     })
   })

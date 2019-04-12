@@ -35,7 +35,7 @@
     "typescript": "^3.4.3"
   },
   "scripts": {
-    "start": "nodemon",
+    "start": "nodemon .",
     "compile": "tsc -w",
     "postinstall": "tsc -p .",
     "fixtures": "node target/fixtures"
