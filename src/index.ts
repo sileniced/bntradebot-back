@@ -2,13 +2,13 @@ import 'reflect-metadata'
 import { Action, useKoaServer } from 'routing-controllers'
 import { Server } from 'http'
 import * as Koa from 'koa'
-import * as IO from 'socket.io'
-import * as socketIoJwtAuth from 'socketio-jwt-auth'
+// import * as IO from 'socket.io'
+// import * as socketIoJwtAuth from 'socketio-jwt-auth'
 import Binance from 'binance-api-node'
 
-import setupDb from './db'
+// import setupDb from './db'
 import { verify } from './jwt'
-import { secret } from './jwt'
+// import { secret } from './jwt'
 
 import HomeController from './controllers/HomeController'
 import LoginController from './logins/LoginController'
@@ -19,7 +19,7 @@ import PublicController from './controllers/Binance/PublicController'
 
 const app = new Koa()
 const server = new Server(app.callback())
-export const io = IO(server)
+// export const io = IO(server)
 export const binance = Binance()
 
 const port = process.env.PORT || 4000
@@ -53,23 +53,23 @@ useKoaServer(app, {
   }
 })
 
-io.use(socketIoJwtAuth.authenticate({ secret }, async (payload, done) => {
-  const user = await User.findOne(payload.id)
-  if (user) done(null, user)
-  else done(null, false, `Invalid JWT user ID`)
-}))
+// io.use(socketIoJwtAuth.authenticate({ secret }, async (payload, done) => {
+//   const user = await User.findOne(payload.id)
+//   if (user) done(null, user)
+//   else done(null, false, `Invalid JWT user ID`)
+// }))
+//
+// io.on('connect', socket => {
+//   const name = socket.request.user.firstName
+//   console.log(`User ${name} just connected`)
+//
+//   socket.on('disconnect', () => {
+//     console.log(`User ${name} just disconnected`)
+//   })
+// })
 
-io.on('connect', socket => {
-  const name = socket.request.user.firstName
-  console.log(`User ${name} just connected`)
-
-  socket.on('disconnect', () => {
-    console.log(`User ${name} just disconnected`)
-  })
-})
-
-setupDb()
-.then(() => {
+// setupDb()
+// .then(() => {
   server.listen(port, () => {
     binance.time().then(time => {
       console!.log(`
@@ -78,6 +78,6 @@ setupDb()
       `)
     })
   })
-})
-.catch((err) => console!.error(err))
+// })
+// .catch((err) => console!.error(err))
 
