@@ -1,16 +1,27 @@
 import { Get, JsonController, Param, QueryParam } from 'routing-controllers'
 import { binance } from '../../index'
-import { CandleChartInterval } from 'binance-api-node'
+import { CandleChartInterval, CandleChartResult } from 'binance-api-node'
+import CandleStickAnalysis from '../../services/candleStickAnalysis'
+import { RSI } from 'technicalindicators'
 
 @JsonController()
 class PublicController {
 
-  @Get('/public/:symbol')
-  public async GetCandles(
+  @Get('/public/analysis/:symbol')
+  public async GetAnalysis(
     @Param('symbol') symbol: string,
-    @QueryParam("interval") interval: CandleChartInterval = '5m'
+    @QueryParam('interval') interval: CandleChartInterval = '5m'
   ) {
-    return await binance.candles({ symbol, interval })
+    const candles: CandleChartResult[] = await binance.candles({ symbol, interval })
+    return {
+      candleStickAnalysis: CandleStickAnalysis(candles),
+      indicators: {
+        RSI: RSI.calculate({
+          period: 14,
+          values: candles.map(candle => parseFloat(candle.close))
+        }).slice(-1)[0]
+      }
+    }
   }
 
 }
