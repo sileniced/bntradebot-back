@@ -60,17 +60,17 @@ export default (candles: CandleChartResult[]) => {
 
   const arrReducer = (acc, [name, amount, weight]) => {
     acc[name] = TI[name.toLowerCase()](dataLast[amount])
-    acc._analysis += acc[name] ? weight : 0
+    acc._score += acc[name] ? weight : 0
     return acc
   }
 
   const analysis = {
-    bullish: bullishArr.reduce(arrReducer, { _analysis: 0 }),
-    bearish: bearishArr.reduce(arrReducer, { _analysis: 0 })
+    bullish: bullishArr.reduce(arrReducer, { _score: 0 }),
+    bearish: bearishArr.reduce(arrReducer, { _score: 0 })
   }
 
   return {
-    _analysis: 0.5 + (analysis.bullish._analysis / 2) - (analysis.bearish._analysis / 2),
+    _score: 0.5 + (analysis.bullish._score / 2) - (analysis.bearish._score / 2),
     ...analysis
   }
 }

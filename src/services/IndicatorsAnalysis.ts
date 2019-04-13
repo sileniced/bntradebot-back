@@ -31,22 +31,22 @@ export default (candles: CandleChartResult[]) => {
       stochasticPeriod: settings.stdPeriod,
       dPeriod: settings.stochRSI.dPeriod,
       kPeriod: settings.stochRSI.kPeriod
-    }).slice(-1)[0],
+    }).slice(-1)[0]
 
   }
 
   return {
     RSI: {
-      value: values.RSI,
-      analysis: values.RSI > settings.RSI.sell ? 0 : (values.RSI < settings.RSI.buy ? 1 : 0.5)
+      _score: values.RSI > settings.RSI.sell ? 0 : (values.RSI < settings.RSI.buy ? 1 : 0.5),
+      value: values.RSI
     },
     stochRSI: {
-      value: values.StochRSI,
-      analysis: values.StochRSI.stochRSI > settings.stochRSI.sell ? (
+      _score: values.StochRSI.stochRSI > settings.stochRSI.sell ? (
         values.StochRSI.k < values.StochRSI.d ? 0 : 0.33
       ) : (
         values.StochRSI.k < values.StochRSI.d ? 0.66 : 1
-      )
+      ),
+      value: values.StochRSI
     }
 
   }
