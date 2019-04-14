@@ -11,5 +11,5 @@ export default (candles: CandleChartResult[]): StockData => candles.reduce((acc:
   open: [],
   close: [],
   high: [],
-  low: []
+  low: [],
 })

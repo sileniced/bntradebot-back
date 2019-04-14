@@ -1,20 +1,19 @@
 import 'reflect-metadata'
-import { Action, useKoaServer } from 'routing-controllers'
+import { useKoaServer } from 'routing-controllers'
 import { Server } from 'http'
 import * as Koa from 'koa'
 // import * as IO from 'socket.io'
 // import * as socketIoJwtAuth from 'socketio-jwt-auth'
 import Binance from 'binance-api-node'
-
 // import setupDb from './db'
-import { verify } from './jwt'
+// import { verify } from './jwt'
 // import { secret } from './jwt'
-
-import HomeController from './controllers/HomeController'
-import LoginController from './logins/LoginController'
-import UserController from './controllers/UserController'
-
-import User from './entities/User'
+//
+// import HomeController from './controllers/HomeController'
+// import LoginController from './logins/LoginController'
+// import UserController from './controllers/UserController'
+//
+// import User from './entities/User'
 import PublicController from './controllers/Binance/PublicController'
 
 const app = new Koa()
@@ -27,30 +26,30 @@ const port = process.env.PORT || 4000
 useKoaServer(app, {
   cors: true,
   controllers: [
-    HomeController,
-    LoginController,
-    UserController,
+    // HomeController,
+    // LoginController,
+    // UserController,
     PublicController
-  ],
-  authorizationChecker: (action: Action) => {
-    const header: string = action.request.headers.authorization
-    if (header && header.startsWith('Bearer ')) {
-      const [, token] = header.split(' ')
-      return !!(token && verify(token))
-    }
-    return false
-  },
-  currentUserChecker: async (action: Action) => {
-    const header: string = action.request.headers.authorization
-    if (header && header.startsWith('Bearer ')) {
-      const [, token] = header.split(' ')
-      if (token) {
-        const id = verify(token).data.id
-        return await User.findOne(id)
-      }
-    }
-    return undefined
-  }
+  ]
+  // authorizationChecker: (action: Action) => {
+  //   const header: string = action.request.headers.authorization
+  //   if (header && header.startsWith('Bearer ')) {
+  //     const [, token] = header.split(' ')
+  //     return !!(token && verify(token))
+  //   }
+  //   return false
+  // },
+  // currentUserChecker: async (action: Action) => {
+  //   const header: string = action.request.headers.authorization
+  //   if (header && header.startsWith('Bearer ')) {
+  //     const [, token] = header.split(' ')
+  //     if (token) {
+  //       const id = verify(token).data.id
+  //       return await User.findOne(id)
+  //     }
+  //   }
+  //   return undefined
+  // }
 })
 
 // io.use(socketIoJwtAuth.authenticate({ secret }, async (payload, done) => {
@@ -70,14 +69,14 @@ useKoaServer(app, {
 
 // setupDb()
 // .then(() => {
-  server.listen(port, () => {
-    binance.time().then(time => {
-      console!.log(`
+server.listen(port, () => {
+  binance.time().then(time => {
+    console!.log(`
       Binance time diff: ${time - Date.now()}ms 
       Listening on port ${port} 
       `)
-    })
   })
+})
 // })
 // .catch((err) => console!.error(err))
 
