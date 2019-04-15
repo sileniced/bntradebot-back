@@ -15,7 +15,7 @@ const bullishArr = addEVENWeight([
   ['BullishHammerStick', 1],
   ['BullishInvertedHammerStick', 1],
   ['HammerPattern', 5],
-  ['HammerPatternUnconfirmed', 5],
+  // ['HammerPatternUnconfirmed', 5],
   ['TweezerBottom', 5]
 ])
 
@@ -32,7 +32,7 @@ const bearishArr = addEVENWeight([
   ['HangingMan', 5],
   ['HangingManUnconfirmed', 5],
   ['ShootingStar', 5],
-  ['ShootingStarUnconfirmed', 5],
+  // ['ShootingStarUnconfirmed', 5],
   ['TweezerTop', 5]
 ])
 

@@ -1,0 +1,1 @@
+export const CryptoPanicAPI = '0e0d2c326110b4f8ba62d8a9393cd0d949a28dee'
