@@ -53,7 +53,7 @@ export default (data: StockData) => {
 
   const arrReducer = (acc, [name, amount, weight], _, src) => {
     acc[name] = TI[name.toLowerCase()](dataLast[amount])
-    acc._score += acc[name] ? weight * (2 - (acc._count / src.length)) : 0
+    acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
     acc._unSigmoidScore += acc[name] ? weight : 0
     acc._count += acc[name] ? 1 : 0
     return acc
