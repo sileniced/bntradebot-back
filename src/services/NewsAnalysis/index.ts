@@ -19,21 +19,30 @@ interface CryptoPanicPost {
   currencies: { code: string; title: string; slug: string; url: string }[]
 }
 
-const weighVotes = votes => Object.entries(settings.votes.moods).reduce((moodAcc, [mood, keyWeights]) => {
-  moodAcc[mood] = Object.entries(keyWeights).reduce((acc, [key, weight]) => {
+const weighVotes = votes => Object.entries(settings.votes.moods).reduce((postAcc, [mood, keyWeights]) => {
+
+  postAcc[mood] = Object.entries(keyWeights).reduce((acc, [key, weight]) => {
     acc[key] = votes[key] * weight
-    acc._score += acc[key]
-    moodAcc._count += acc[key]
-    moodAcc._unWeightedScore += mood === 'bullish' ? acc[key] : 0
+    acc._total += acc[key]
+    postAcc._totalMoodVotes += acc[key]
+    postAcc._totalVotes += acc[key]
     return acc
-  }, { _score: 0 })
-  moodAcc._score = moodAcc._count > 0 ? moodAcc._unWeightedScore / moodAcc._count : 1 / 2
-  return moodAcc
+  }, postAcc[mood])
+
+  postAcc._postWeight = Object.entries(settings.votes.weights).reduce((acc, [key, weight]) => {
+    postAcc._totalVotes += votes[key] * weight
+    return acc * Math.pow(weight, votes[key])
+  }, 1)
+
+  postAcc._score = (0.5 * (postAcc.bullish._total - postAcc.bearish._total + postAcc._totalMoodVotes)) / postAcc._totalMoodVotes
+  return postAcc
 }, {
-  _score: 0,
-  _postWeight: Object.entries(settings.votes.weights).reduce((acc, [key, weight]) => acc * Math.pow(weight, votes[key]), 1),
-  _unWeightedScore: 0,
-  _count: 0
+  _score: 0.5,
+  _postWeight: 0,
+  _totalMoodVotes: 0,
+  _totalVotes: 0,
+  bullish: { _total: 0 },
+  bearish: { _total: 0 }
 })
 
 const pageList = [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]
@@ -50,7 +59,9 @@ export default async pairs => {
       }
   }, [])
 
+
   const fetchLink = `https://cryptopanic.com/api/v1/posts/?auth_token=${CryptoPanicAPI}&currencies=${symbols.join(',')}`
+
 
   const fetchResult: CryptoPanicPost[][] = await Promise.all(pageList.map(pages => {
     const newsFetcher = async () => {
@@ -60,50 +71,64 @@ export default async pairs => {
     return new Promise(resolve => setTimeout(() => resolve(newsFetcher()), pages[0] === 1 ? 0 : 1000))
   }))
 
+
   const posts = fetchResult.reduce((acc: [], pageListResult: CryptoPanicPost[]) => [...acc, ...pageListResult], [])
 
-  const values = posts.reduce((acc, { votes, currencies, title, created_at }: CryptoPanicPost) => {
-    const age = Date.now() - Date.parse(created_at)
-    acc.ages.push(age)
+
+  const values = posts.reduce((acc, { votes, currencies, title, published_at }: CryptoPanicPost) => {
+    const age = Date.now() - Date.parse(published_at)
+    const weightedVotes = weighVotes(votes)
 
     currencies.forEach(({ code }) => {
       if (!symbols.includes(code)) return acc
 
-      const weightedVotes = weighVotes(votes)
-
       if (!acc.symbols[code]) {
         acc.symbols[code] = []
-        acc.postWeights[code] = 0
+        acc._totalPostWeight[code] = 0
+        acc._totalVotes[code] = 0
+        acc._totalAges[code] = 0
       }
-      acc.postWeights[code] += weightedVotes._postWeight
+
+      acc._totalPostWeight[code] += weightedVotes._postWeight
+      acc._totalVotes[code] += weightedVotes._totalVotes
+      acc._totalAges[code] += age
+
       acc.symbols[code].push({
-        _weightedVotes: weightedVotes,
-        votes,
         title,
-        age
+        _weightedVotes: weightedVotes,
+        age,
       })
     })
 
     return acc
   }, {
-    ages: [] as number[],
-    postWeights: {},
+    _totalPostWeight: {},
+    _totalVotes: {},
+    _totalAges: {},
     symbols: {}
   })
 
-  const oldestPost = Math.max(...values.ages)
 
   const analysis = Object.entries(values.symbols).reduce((acc, [symbol, valueList]: any) => {
     valueList.forEach(value => {
-      acc[symbol] += value._weightedVotes._score * (/*(value.age / oldestPost) * */(value._weightedVotes._postWeight / values.postWeights[symbol])) // todo: bug
+
+      const score = {
+        post: value._weightedVotes._score * value._weightedVotes._postWeight / values._totalPostWeight[symbol],
+        vote: value._weightedVotes._score * value._weightedVotes._totalVotes / values._totalVotes[symbol],
+        ages: value._weightedVotes._score * (values._totalAges[symbol] - value.age) / values._totalAges[symbol]
+      }
+
+      acc[symbol] += (score.post + score.vote + score.ages) / values.symbols[symbol].length
     })
     return acc
-  }, symbols.reduce((acc, symbol) => {
-    acc[symbol] = 0
+  }, Object.keys(values.symbols).reduce((acc, symbol) => {
+    acc[symbol] = 0 // todo: bug
     return acc
   }, {}))
 
+
   return {
+    fetchLink,
     analysis,
     values
   }
