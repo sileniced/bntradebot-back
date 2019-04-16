@@ -14,7 +14,7 @@ class PublicController {
     // const intervalAnalysis = intervalAnalysisArray.reduce((acc, symbolAnalysis) => ({ ...acc, ...symbolAnalysis }), {})
 
     // const newsAnalysis = NewsAnalysis(symbols)
-    await NewsAnalysis(symbols)
+    // await NewsAnalysis(symbols)
 
     // return {
     //   _scores: symbols.reduce((acc, symbol) => {
@@ -29,7 +29,7 @@ class PublicController {
     //   analysis: intervalAnalysis
     // }
 
-    return 'test'
+    return await NewsAnalysis(symbols)
   }
 }
 
