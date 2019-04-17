@@ -3,7 +3,7 @@ import Oscillators from './Oscillators'
 import CandleStickAnalysis from './CandleStickAnalysis'
 import MovingAverages from './MovingAverages'
 import { CandleChartResult } from 'binance-api-node'
-import { binance } from '../index'
+import { Binance } from '../index'
 import CreateStockData from './CreateStockData'
 import StockData from 'technicalindicators/declarations/StockData'
 
@@ -18,7 +18,7 @@ const analysisList = addEVENWeight([
 
 export default async symbol => {
 
-  const candlesList: CandleChartResult[][] = await Promise.all(intervalList.map(([interval]) => binance.candles({
+  const candlesList: CandleChartResult[][] = await Promise.all(intervalList.map(([interval]) => Binance.api.candles({
     symbol,
     interval,
     limit: 200
