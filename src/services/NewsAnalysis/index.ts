@@ -34,7 +34,8 @@ const weighVotes = votes => Object.entries(settings.votes.moods).reduce((postAcc
     return acc * Math.pow(weight, votes[key])
   }, 1)
 
-  postAcc._score = (0.5 * (postAcc.bullish._total - postAcc.bearish._total + postAcc._totalMoodVotes)) / postAcc._totalMoodVotes
+  postAcc._score = postAcc._totalMoodVotes > 0 ? ((1 / 2) * (postAcc.bullish._total - postAcc.bearish._total + postAcc._totalMoodVotes)) / postAcc._totalMoodVotes : 1 / 2
+
   return postAcc
 }, {
   _score: 0.5,
@@ -65,7 +66,7 @@ export default async pairs => {
 
   const fetchResult: CryptoPanicPost[][] = await Promise.all(pageList.map(pages => {
     const newsFetcher = async () => {
-      const fetchResult: Response[] = await Promise.all(pages.map(page => request.get(`${fetchLink}&page=${page}&filter=rising`)))
+      const fetchResult: Response[] = await Promise.all(pages.map(page => request.get(`${fetchLink}&page=${page}`)))
       return fetchResult.reduce((acc: [], result: Response) => [...acc, ...result.body.results], [])
     }
     return new Promise(resolve => setTimeout(() => resolve(newsFetcher()), pages[0] === 1 ? 0 : 1000))
