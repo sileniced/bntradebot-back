@@ -3,7 +3,7 @@ import SymbolAnalysis from '../../services/SymbolAnalysis'
 import User from '../../entities/User'
 import { standardSymbols } from '../../constants'
 import { Binance } from '../../index'
-import { Bid } from 'binance-api-node'
+import { Bid, OrderBook } from 'binance-api-node'
 
 @JsonController()
 class AuthenticatedController {
@@ -34,12 +34,16 @@ class AuthenticatedController {
         balance.asset === pair.baseAsset || balance.asset === pair.quoteAsset
       ).length > 0
     )
-    const balanceBooksUnnamed = await Promise.all(balances.map(pair => Binance.getBook(pair.asset !== 'USDT' ? `${pair.asset}BTC` : 'BTCUSDT')))
-    const symbolsFilteredBooks = symbols.filter(symbol => balances.filter(balance => balance.asset === symbol).length > 0)
-    const symbolBooksUnnamedPromises = Promise.all(symbolsFilteredBooks.map(symbol => Binance.getBook(symbol !== 'USDT' ? `${symbol}BTC` : 'BTCUSDT')))
 
-    const balanceBookBtc = balanceBooksUnnamed.reduce((acc, book, idx) => {
-      acc[balances[idx].asset] = book
+    const standardBookNames = ['BTC', 'USDT']
+
+    const balanceFilteredBooks = balances.filter(({ asset }) => !standardBookNames.includes(asset))
+    const balanceBooksUnnamed = await Promise.all([...balanceFilteredBooks.map(({ asset }) => Binance.getBook(`${asset}BTC`)), Binance.getBook(standardBookNames.join(''))])
+
+    const balanceBookBtc: {
+      [symbol: string]: OrderBook
+    } = balanceBooksUnnamed.reduce((acc, book, idx) => {
+      acc[balanceFilteredBooks[idx] ? balanceFilteredBooks[idx].asset : standardBookNames[1]] = book
       return acc
     }, {})
 
@@ -78,24 +82,12 @@ class AuthenticatedController {
       return acc
     }, {})
 
-    const symbolAnalysis = await symbolAnalysisPromise
+    const symbolsFilteredBooks = symbols.filter(symbol => !standardBookNames.includes(symbol) && !balanceFilteredBooks.filter(balance => balance.asset === symbol).length)
+    const symbolBooksUnnamed = await Promise.all(symbolsFilteredBooks.map(symbol => Binance.getBook(`${symbol}BTC`)))
 
-    const { differences, symbolPieBtc, btcDifference } = Object.entries(symbolAnalysis.symbolPie).reduce((acc, [symbol, percentage]: [string, number]) => {
-      acc.differences[symbol] = !balancesDenormalized[symbol] ? percentage : percentage - balancesDenormalized[symbol]
-      acc.symbolPieBtc[symbol] = percentage * totalBtcValue
-      acc.btcDifference[acc.differences[symbol] < 0 ? 'sell' : 'buy'][symbol] = acc.differences[symbol] * totalBtcValue
-      return acc
-    }, {
-      differences: {},
-      symbolPieBtc: {},
-      btcDifference: {
-        sell: {},
-        buy: {}
-      }
-    })
-
-    const symbolBooksUnnamed = await symbolBooksUnnamedPromises
-    const symbolBooksBtc = {
+    const symbolBooksBtc: {
+      [symbol: string]: OrderBook
+    } = {
       ...balanceBookBtc,
       ...symbolBooksUnnamed.reduce((acc, book, idx) => {
         acc[symbolsFilteredBooks[idx]] = book
@@ -103,13 +95,67 @@ class AuthenticatedController {
       }, {})
     }
 
+    const symbolAnalysis = await symbolAnalysisPromise
+
+    function getSymbolAmount(balance: number, book: Bid[]) {
+      let page = 0
+      let amount = 0
+      while (balance > 0) {
+        const quantity = parseFloat(book[page].quantity) * parseFloat(book[page].price)
+        if (quantity >= balance) {
+          amount += parseFloat(book[page].quantity) * balance / quantity
+          balance = 0
+        } else {
+          amount += parseFloat(book[page].quantity)
+          balance -= quantity
+        }
+        page++
+      }
+      return amount
+    }
+
+    const { percentDifferences, btcAmount, btcDifference, symbolAmount } = Object.entries(symbolAnalysis.symbolPie).reduce((acc, [symbol, percentage]: [string, number]) => {
+      acc.percentDifferences[symbol] = !balancesDenormalized[symbol] ? percentage : percentage - balancesDenormalized[symbol]
+      acc.btcAmount[symbol] = percentage * totalBtcValue
+      acc.btcDifference[acc.percentDifferences[symbol] < 0 ? 'sell' : 'buy'][symbol] = Math.abs(acc.percentDifferences[symbol] * totalBtcValue)
+      acc.symbolAmount[acc.percentDifferences[symbol] < 0 ? 'sell' : 'buy'][symbol] = symbol === 'BTC' ? Math.abs(acc.percentDifferences[symbol] * totalBtcValue) : getSymbolAmount(acc.btcAmount[symbol], symbolBooksBtc[symbol].asks)
+      return acc
+    }, {
+      symbolAmount: {
+        sell: {},
+        buy: {}
+      },
+      btcDifference: {
+        sell: {},
+        buy: {}
+      },
+      btcAmount: {},
+      percentDifferences: {}
+    })
+
+
+    /*
+
+    todo: Here make a list of all the coins that need to sell
+    todo: They need to make as much pairs with the buy list
+    todo: find the shortest route
+
+
+
+     */
+
+
+
+
+
 
 
     return {
       data: {
-        differences,
-        symbolPieBtc,
+        symbolAmount,
         btcDifference,
+        percentDifferences,
+        btcAmount,
         symbolBooksBtc,
         balances: balancesPercentages,
         analysis: symbolAnalysis
