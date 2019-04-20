@@ -26,6 +26,9 @@ class User extends BaseEntity {
   @Column('text', { nullable: true })
   public binanceSecret: string
 
+  @Column('bool', { nullable: true })
+  public autoTrading: boolean
+
   @Column('text', { nullable: true })
   @Exclude({ toPlainOnly: true })
   public password: string

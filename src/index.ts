@@ -46,7 +46,16 @@ useKoaServer(app, {
       const [, token] = header.split(' ')
       if (token) {
         const id = verify(token).data.id
-        return await User.findOne(id)
+        const user = await User.findOne(id)
+        if (!user) return undefined
+        if (!Binance.checkAuthenticatedApi(user.id)) {
+          Binance.setAuthenticatedApi(user.id, {
+            apiKey: user.binanceKey,
+            apiSecret: user.binanceSecret
+          })
+          console.log(`new Auth user: ${user.fullName()}`)
+        }
+        return user
       }
     }
     return undefined
@@ -72,6 +81,7 @@ setupDb().then(() => {
   server.listen(port, () => {
     console.log(`Listening on port ${port}`)
     Binance.getTime().then(time => {
+      Binance.startAutoTradeBots()
       console!.log(`Binance time diff: ${time - Date.now()}ms`)
     })
   })
