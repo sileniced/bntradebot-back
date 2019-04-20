@@ -16,5 +16,6 @@ export default {
       lol: 0.95,
       toxic: 0.5
     }
-  }
+  },
+  newsDivider: 10
 }

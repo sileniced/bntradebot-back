@@ -1,7 +1,8 @@
 import * as bcrypt from 'bcrypt'
 import { Exclude } from 'class-transformer'
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import { BaseEntity } from 'typeorm/repository/BaseEntity'
+import SavedOrder from './SavedOrder'
 
 @Entity()
 class User extends BaseEntity {
@@ -28,6 +29,9 @@ class User extends BaseEntity {
 
   @Column('bool', { nullable: true })
   public autoTrading: boolean
+
+  @OneToMany(() => SavedOrder, savedOrder => savedOrder.user)
+  public savedOrders: SavedOrder
 
   @Column('text', { nullable: true })
   @Exclude({ toPlainOnly: true })

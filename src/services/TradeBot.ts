@@ -11,14 +11,29 @@ import {
   SymbolMinNotionalFilter
 } from 'binance-api-node'
 import IntervalAnalysis from './IntervalAnalysis'
+import newsSettings from './NewsAnalysis/settings'
+import SavedOrder from '../entities/SavedOrder'
 
-export default async (user) => {
+export interface TradeBot {
+  data: {
+    ordersResult: SavedOrder[];
+    orderPairs: {
+      side: OrderSide;
+      qty: number;
+      pair: string
+    }[];
+    finalOrders: NewOrder[];
+    participatingPairs: [string, any][];
+    pieChart: ({})[]
+  }
+}
+
+export default async (user): Promise<TradeBot> => {
   const symbols = ['USDT', ...standardSymbols.toUpperCase().split(',')]
   const allPairs = await Binance.getPairs()
   const pairsInfo = allPairs.filter(pair => symbols.includes(pair.baseAsset) && symbols.includes(pair.quoteAsset))
 
   const symbolAnalysisPromise = SymbolAnalysis(symbols, pairsInfo)
-
 
 
   const allBalances = await Binance.getAccountBalances(user.id)
@@ -122,11 +137,15 @@ export default async (user) => {
   }
 
   const {
-    percentDifferences, btcAmount, btcDifference, symbolAmount, marketArr
+    percentDifferences,
+    // btcAmount,
+    btcDifference,
+    symbolAmount,
+    marketArr
   } = Object.entries(symbolAnalysis.symbolPie).reduce((acc, [symbol, percentage]: [string, number]) => {
     acc.percentDifferences[symbol] = !balancesDenormalized[symbol] ? percentage : percentage - balancesDenormalized[symbol]
     const bs = acc.percentDifferences[symbol] < 0 ? 'sell' : 'buy'
-    acc.btcAmount[symbol] = percentage * totalBtcValue
+    // acc.btcAmount[symbol] = percentage * totalBtcValue
     acc.btcDifference[bs][symbol] = Math.abs(acc.percentDifferences[symbol] * totalBtcValue)
     acc.symbolAmount[bs][symbol] = symbol === 'BTC'
       ? Math.abs(acc.percentDifferences[symbol] * totalBtcValue)
@@ -137,7 +156,7 @@ export default async (user) => {
     marketArr: { sell: [] as string[], buy: [] as string[] },
     symbolAmount: { sell: {}, buy: {} },
     btcDifference: { sell: {}, buy: {} },
-    btcAmount: {},
+    // btcAmount: {},
     percentDifferences: {}
   })
 
@@ -154,7 +173,7 @@ export default async (user) => {
   }, {})
 
   /*
-  todo: are all symbols covered? what about double transactions
+  todo: are all symbols represented? what about double transactions
    */
 
   const newSymbolAnalysis = await Promise.all(Object.entries(markets).reduce((acc, [, buySymbols]) => {
@@ -166,7 +185,7 @@ export default async (user) => {
 
   const newSymbolAnalysisWithNews = newSymbolAnalysis.reduce((acc, pairScore) => {
     Object.entries(pairScore).forEach(([pair, { _score }]: [string, { _score: number }]) => {
-      const score = (_score / 4 * 3) + (symbolAnalysis.analysis.news[pair] / 4)
+      const score = (_score / newsSettings.newsDivider * (newsSettings.newsDivider - 1)) + (symbolAnalysis.analysis.news[pair] / newsSettings.newsDivider)
       const ls = (score - 1 / 2)
       acc[pair] = {
         _pairScore: score,
@@ -206,12 +225,12 @@ export default async (user) => {
   const orderPairs = participatingPairs.map(([, { buy, sell, pairInfo }]): OrderData => {
 
     const bool = buy > 0 && sell === 0
-    const bqBuy = bool ? 'baseAsset' : 'quoteAsset'
-    const bqSell = bool ? 'quoteAsset' : 'baseAsset'
+    // const bqBuy = bool ? 'baseAsset' : 'quoteAsset'
+    // const bqSell = bool ? 'quoteAsset' : 'baseAsset'
     const bqBase = bool ? 'buy' : 'sell'
     const bqQuote = bool ? 'sell' : 'buy'
 
-    const participating = participatingPairs.filter(([, { pairInfo: pairInfo2 }]) => pairInfo[bqBuy] === pairInfo2.baseAsset || pairInfo[bqBuy] === pairInfo2.quoteAsset)
+    // const participating = participatingPairs.filter(([, { pairInfo: pairInfo2 }]) => pairInfo[bqBuy] === pairInfo2.baseAsset || pairInfo[bqBuy] === pairInfo2.quoteAsset)
 
     return {
       prototype: {
@@ -220,17 +239,17 @@ export default async (user) => {
         type: 'MARKET',
         quantity: symbolAmount[bqBase][pairInfo.baseAsset]
       },
-      extra: {
-        'what_you_want': pairInfo[bqBuy],
-        'how_much_you_want_of_it': symbolAmount.buy[pairInfo[bqBuy]],
-        'how_much_is_this_in_btc': btcDifference.buy[pairInfo[bqBuy]],
-        'how_much_you_can_pay_for_it': symbolAmount.sell[pairInfo[bqSell]],
-        'how_much_is_that_in_btc': btcDifference.sell[pairInfo[bqSell]],
-        'what_is_the_size_of_the_transaction': btcDifference.buy[pairInfo[bqBuy]],
-        'can_you_pay_for_it?': btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]] > 0,
-        [btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]] > 0 ? 'how_much_you_have_left' : 'how_much_you_need']: Math.abs(btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]]),
-        'how_many_symbols_are_paying_for_it': participating.length
-      },
+      // extra: {
+      //   'what_you_want': pairInfo[bqBuy],
+      //   'how_much_you_want_of_it': symbolAmount.buy[pairInfo[bqBuy]],
+      //   'how_much_is_this_in_btc': btcDifference.buy[pairInfo[bqBuy]],
+      //   'how_much_you_can_pay_for_it': symbolAmount.sell[pairInfo[bqSell]],
+      //   'how_much_is_that_in_btc': btcDifference.sell[pairInfo[bqSell]],
+      //   'what_is_the_size_of_the_transaction': btcDifference.buy[pairInfo[bqBuy]],
+      //   'can_you_pay_for_it?': btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]] > 0,
+      //   [btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]] > 0 ? 'how_much_you_have_left' : 'how_much_you_need']: Math.abs(btcDifference.sell[pairInfo[bqSell]] - btcDifference.buy[pairInfo[bqBuy]]),
+      //   'how_many_symbols_are_paying_for_it': participating.length
+      // },
       pair: pairInfo.symbol,
       side: buy > 0 && sell === 0 ? 'BUY' : 'SELL',
       baseSymbolAmount: symbolAmount[bqBase][pairInfo.baseAsset],
@@ -311,35 +330,35 @@ export default async (user) => {
         // involvedIn: involved
       }
     }
-    if (!acc.buy[order.pairInfo[bqBuy]]) {
-      const involved = orderPairs.filter(orderPair => order.pairInfo[bqBuy] === orderPair.pairInfo.quoteAsset || order.pairInfo[bqBuy] === orderPair.pairInfo.baseAsset)
-      acc.buy[order.pairInfo[bqBuy]] = {
-        total: 0,
-        weighted: 0,
-        involvedLength: involved.length,
-        involvedWith: involved.map(involvedOrder => involvedOrder.side === 'BUY' ? involvedOrder.pairInfo[bqSell] : involvedOrder.pairInfo[bqBuy])
-        // involvedIn: involved
-      }
-    }
+    // if (!acc.buy[order.pairInfo[bqBuy]]) {
+    //   const involved = orderPairs.filter(orderPair => order.pairInfo[bqBuy] === orderPair.pairInfo.quoteAsset || order.pairInfo[bqBuy] === orderPair.pairInfo.baseAsset)
+    //   acc.buy[order.pairInfo[bqBuy]] = {
+    //     total: 0,
+    //     weighted: 0,
+    //     involvedLength: involved.length,
+    //     involvedWith: involved.map(involvedOrder => involvedOrder.side === 'BUY' ? involvedOrder.pairInfo[bqSell] : involvedOrder.pairInfo[bqBuy])
+    //     // involvedIn: involved
+    //   }
+    // }
 
     acc.sell[order.pairInfo[bqSell]].total += order[bqSellBtc]
     acc.sell[order.pairInfo[bqSell]].weighted += order[bqSellBtc] / acc.sell[order.pairInfo[bqSell]].involvedLength
-    acc.buy[order.pairInfo[bqBuy]].total += order[bqBuyBtc]
-    acc.buy[order.pairInfo[bqBuy]].weighted += order[bqBuyBtc] / acc.buy[order.pairInfo[bqBuy]].involvedLength
+    // acc.buy[order.pairInfo[bqBuy]].total += order[bqBuyBtc]
+    // acc.buy[order.pairInfo[bqBuy]].weighted += order[bqBuyBtc] / acc.buy[order.pairInfo[bqBuy]].involvedLength
     return acc
   }, {
     sell: {} as {
       [symbol: string]: ProviderInfo
-    },
-    buy: {} as {
-      [symbol: string]: {
-        total: number,
-        weighted: number
-        involvedLength: number,
-        involvedWith: string[],
-        // involvedIn: OrderData[],
-      }
     }
+    // buy: {} as {
+    //   [symbol: string]: {
+    //     total: number,
+    //     weighted: number
+    //     involvedLength: number,
+    //     involvedWith: string[],
+    //     // involvedIn: OrderData[],
+    //   }
+    // }
   })
 
   const orderBooksUnnamed = await orderBooksUnnamedPromise
@@ -349,7 +368,9 @@ export default async (user) => {
   }, {})
 
   function getNotionalAmount(pair, side, balance): number {
-    const book = orderBooks[pair][side === 'BUY' ? 'bids' : 'asks']
+    // todo: BUGGY BUGGY BUGGY BUGGY BUGGY BUGGY
+    // todo: I need to find out if it's either 'asks' or 'bids' at the 'BUY' side
+    const book = orderBooks[pair][side === 'BUY' ? 'asks' : 'bids']
     let page = 0
     let amount = 0
     if (side === 'BUY') {
@@ -382,6 +403,7 @@ export default async (user) => {
 
     }
 
+    console.error('CRITICAL BUG, why arent you going after it')
     console.log('pair, side, balance, amount, page = ', pair, side, balance, amount, page)
     return amount
   }
@@ -400,14 +422,6 @@ export default async (user) => {
 
     function parseQuantity(qty: number, stepSize: string) {
       const size = parseFloat(stepSize)
-      console.log(`
-          qty: ${qty}, stepSize: ${stepSize}
-          size: ${size}
-          step 1: ${qty / size}
-          step 2: ${Math.floor(qty / size)}
-          step 3: ${Math.floor(qty / size) * size}
-          alte 3: ${Math.floor(qty / size) / (1 / size)}
-        `)
       return (Math.floor(qty / size) / (1 / size))
     }
 
@@ -420,7 +434,13 @@ export default async (user) => {
             ? parseQuantity(demand.demandSym, demand.lotSize.stepSize)
             : parseQuantity(provider.spendable * (demand.demandBtc / provider.spendableBtc), demand.lotSize.stepSize)
 
-          if (quantity >= parseFloat(demand.lotSize.minQty) && getNotionalAmount(demand.pair, demand.side, quantity) >= parseFloat(demand.minNotional.minNotional)) {
+          const notationalAmount = getNotionalAmount(demand.pair, demand.side, quantity)
+
+          if (
+            (quantity >= parseFloat(demand.lotSize.minQty))
+            && (notationalAmount >= parseFloat(demand.minNotional.minNotional))
+            && (demand.side === 'BUY' ? notationalAmount < provider.totalSpendable : demand.demandSym < provider.totalSpendable)
+          ) {
             finalOrders.push({
               symbol: demand.pair,
               side: demand.side,
@@ -444,7 +464,12 @@ export default async (user) => {
             ? parseQuantity(demand.demandSym * (provider.spendableBtc / demand.demandBtc), demand.lotSize.stepSize)
             : parseQuantity(provider.spendable, demand.lotSize.stepSize)
 
-          if (quantity >= parseFloat(demand.lotSize.minQty) && getNotionalAmount(demand.pair, demand.side, quantity) >= parseFloat(demand.minNotional.minNotional)) {
+          const notionalAmount = getNotionalAmount(demand.pair, demand.side, quantity)
+
+          if ((quantity >= parseFloat(demand.lotSize.minQty))
+            && (notionalAmount >= parseFloat(demand.minNotional.minNotional))
+            && (demand.side === 'BUY' ? notionalAmount < provider.totalSpendable : demand.demandSym < provider.totalSpendable)
+          ) {
             finalOrders.push({
               symbol: demand.pair,
               side: demand.side,
@@ -494,26 +519,30 @@ export default async (user) => {
 
   const finalOrders = getFinalOrders()
 
-  const ordersResult = await Promise.all(finalOrders.map(newOrder => Binance.newOrder(user.id, newOrder)))
+  const ordersResult = await Promise.all(finalOrders.map(newOrder => Binance.newOrder(user, newOrder)))
 
   return {
     data: {
       ordersResult,
       finalOrders,
-      orderBooks,
-      orderPairs,
+      // orderBooks,
+      orderPairs: orderPairs.map(order => ({
+        pair: order.pair,
+        side: order.side,
+        qty: order.side === 'BUY' ? order.baseSymbolAmount : order.quotSymbolAmount
+      })),
+      participatingPairs,
       // newSymbolAnalysisWithNews,
       // newSymbolAnalysis,
 
-      participatingPairs,
       // markets,
-      symbolAmount,
-      btcDifference,
-      percentDifferences,
-      btcAmount,
-      pieChart: symbolAnalysis.symbolPie,
-      balances: balancesPercentages,
-      analysis: symbolAnalysis
+      // symbolAmount,
+      // btcDifference,
+
+      // btcAmount,
+      pieChart: [symbolAnalysis.symbolPie, percentDifferences]
+      // balances: balancesPercentages,
+      // analysis: symbolAnalysis
     }
   }
 }

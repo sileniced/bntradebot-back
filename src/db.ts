@@ -2,13 +2,15 @@ import { createConnection } from 'typeorm'
 import { CustomNamingStrategy } from './customNamingStrategy'
 
 import User from './entities/User'
+import SavedOrder from './entities/SavedOrder'
 
 const db = () =>
   createConnection({
     entities: [
       User,
+      SavedOrder
     ],
-    logging: true,
+    logging: false,
     namingStrategy: new CustomNamingStrategy(),
     synchronize: true,
     type: 'postgres',

@@ -3,6 +3,7 @@ import IntervalAnalysis from './IntervalAnalysis'
 import NewsAnalysis from './NewsAnalysis'
 import { symbolToPairs } from './utils'
 import { Binance } from '../index'
+import newsSettings from './NewsAnalysis/settings'
 
 export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
   const startTime = Date.now()
@@ -34,7 +35,7 @@ export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
 
   const scores = pairsInfo.reduce((acc, { symbol: pair, baseAsset, quoteAsset }) => {
 
-    const score = (analysis.interval[pair]._score / 4 * 3) + (analysis.news[pair] / 4)
+    const score = (analysis.interval[pair]._score / newsSettings.newsDivider * (newsSettings.newsDivider - 1)) + (analysis.news[pair] / newsSettings.newsDivider)
     const ls = (score - 1 / 2)
 
     acc.pairs[pair] = {

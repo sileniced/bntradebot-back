@@ -22,7 +22,6 @@ const intervalList = addEVENWeight(
     0.06666666667,
     0.07777777778,
     0.08888888889
-
   ]
 )
 // const intervalList = addEVENWeight([['1m'], ['15m'], ['30m'], ['1h'], ['6h'], ['12h'], ['1d']])
