@@ -7,7 +7,24 @@ import { Binance } from '../index'
 import CreateStockData from './CreateStockData'
 import StockData from 'technicalindicators/declarations/StockData'
 
-const intervalList = addEVENWeight([['1m'], ['3m'], ['5m'], ['15m'], ['30m'], ['1h'], ['2h'], ['4h'], ['6h'], ['8h'], ['12h'], ['1d']])
+const intervalList = addEVENWeight(
+  [['1m'], ['3m'], ['5m'], ['15m'], ['30m'], ['1h'], ['2h'], ['4h'], ['6h'], ['8h'], ['12h'], ['1d']],
+  [
+    0.07777777778,
+    0.08888888889,
+    0.10000000000,
+    0.11111111111,
+    0.10000000000,
+    0.08888888889,
+    0.07777777778,
+    0.06666666667,
+    0.05555555556,
+    0.06666666667,
+    0.07777777778,
+    0.08888888889
+
+  ]
+)
 // const intervalList = addEVENWeight([['1m'], ['15m'], ['30m'], ['1h'], ['6h'], ['12h'], ['1d']])
 
 const analysisList = addEVENWeight([
@@ -51,7 +68,7 @@ export default async symbol => {
   return {
     [symbol]: {
       _score: addScores(intervalAnalysis),
-      intervalAnalysis
+      // intervalAnalysis
     }
   }
 }

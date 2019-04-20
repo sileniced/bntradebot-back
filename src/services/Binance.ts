@@ -1,4 +1,4 @@
-import binance, { Binance, ExchangeInfo, Symbol, AssetBalance, OrderBook } from 'binance-api-node'
+import binance, { Binance, ExchangeInfo, Symbol, AssetBalance, OrderBook, NewOrder, Order } from 'binance-api-node'
 
 class BinanceApi {
 
@@ -26,7 +26,7 @@ class BinanceApi {
   public getAccountBalances = (userId: number): Promise<AssetBalance[]> => this.authenticatedApi[userId].accountInfo()
   .then(result => result.balances)
 
-
+  public newOrder = (userId: number, order: NewOrder): Promise<Order> => this.authenticatedApi[userId].order(order)
 }
 
 export default BinanceApi
