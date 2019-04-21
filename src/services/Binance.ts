@@ -9,8 +9,8 @@ import binance, {
   OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill, AvgPriceResult
 } from 'binance-api-node'
 import User from '../entities/User'
-import tradebot, { TradeBot } from './TradeBot'
 import SavedOrder from '../entities/SavedOrder'
+import TradeBotNew from './TradeBotNew'
 
 interface realOrder {
   clientOrderId: string;
@@ -42,57 +42,25 @@ class BinanceApi {
     globalTradeInterval: 1000 * 60 * 15
   }
 
-  private readonly beautifulLog = (result: TradeBot) => [
-    `
-  
-  tradeinterval: ${this.settings.globalTradeInterval / 1000 / 60}m
-  bugs: getNotionalAmount()
-  performance: ${result.data.time}ms
-  time: ${new Date()}
-  
-    balance: BTC: ${result.data.balance.btc.toFixed(8)} - USD: $${result.data.balance.usd.toFixed(4)}
-  
-  Symbol Pie:
-  `,
-    `
-  
-  Candidate Analysis:
-  `,
-    `
-  
-  Participating Pairs: 
-  ${result.data.participatingPairs.toString()}
-  
-  Negotiation Orders:
-  `,
-    `
-  
-  Final Orders: 
-  `,
-    `
-  
-  Order Result: 
-  `
-  ]
-
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
     this.activeTradeBotUserIds.forEach(id => {
-      tradebot(this.activeTradeBotUsers[id]).then(result => {
-        const log = this.beautifulLog(result)
-        console.log(log[0])
-        console.table(result.data.pieChart)
-        console.log(log[1])
-        console.table(result.data.candidateAnalysis)
-        console.log(log[2])
-        console.table(result.data.negotiationOrders)
-        console.log(log[3])
-        console.table(result.data.finalOrders)
-        console.log(log[4])
-        console.table(result.data.ordersResult)
-
-      })
+      // tradebot(this.activeTradeBotUsers[id]).then(result => {
+      //   const log = this.beautifulLog(result)
+      //   console.log(log[0])
+      //   console.table(result.data.pieChart)
+      //   console.log(log[1])
+      //   console.table(result.data.candidateAnalysis)
+      //   console.log(log[2])
+      //   console.table(result.data.negotiationOrders)
+      //   console.log(log[3])
+      //   console.table(result.data.finalOrders)
+      //   console.log(log[4])
+      //   console.table(result.data.ordersResult)
+      //
+      // })
+      new TradeBotNew(this.activeTradeBotUsers[id]).run()
     })
   }
 

@@ -1,7 +1,7 @@
 import { Authorized, CurrentUser, Get, JsonController, Param } from 'routing-controllers'
 import SymbolAnalysis from '../../services/SymbolAnalysis'
 import User from '../../entities/User'
-import TradeBot from '../../services/TradeBot'
+import TradeBotNew from '../../services/TradeBotNew'
 
 @JsonController()
 class AuthenticatedController {
@@ -11,7 +11,7 @@ class AuthenticatedController {
   public async GetAnalysis(
     @CurrentUser() user: User
   ) {
-    return TradeBot(user)
+    return new TradeBotNew(user).run()
   }
 
   @Get('/authenticated/analysis/:symbolsParam')

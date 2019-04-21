@@ -5,7 +5,30 @@ import { symbolToPairs } from './utils'
 import { Binance } from '../index'
 import newsSettings from './NewsAnalysis/settings'
 
-export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
+export interface PairScore {
+  _pairScore: number,
+  base: {
+    symbol: string,
+    score: number
+  },
+  quote: {
+    symbol: string,
+    score: number
+  }
+}
+
+
+export interface ISymbolAnalysis {
+  _scores: {
+    symbols: { [symbol: string]: number };
+    pairs: { [pair: string]: PairScore };
+    totalSymbols: number
+  };
+  symbolPie: { [symbol: string]: number };
+  // analysis: { news: [string, any]; interval: any }
+}
+
+export default async (symbols: string[], pairsInfo: Symbol[] = []): Promise<ISymbolAnalysis> => {
   const startTime = Date.now()
 
   pairsInfo = pairsInfo.length === 0 ? await (async () => {
@@ -18,7 +41,7 @@ export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
   const pairsPerSymbol = symbols.reduce((acc, symbol) => {
     acc[symbol] = []
     pairsInfo.forEach(pair => {
-      if (pair.baseAsset === symbol || pair.quoteAsset === symbol ) {
+      if (pair.baseAsset === symbol || pair.quoteAsset === symbol) {
         acc[symbol].push(pair)
       }
     })
@@ -40,31 +63,49 @@ export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
 
     acc.pairs[pair] = {
       _pairScore: score,
-      [baseAsset]: ls > 0 ? ls * 2 : 0,
-      [quoteAsset]: ls < 0 ? -ls * 2 : 0
+      base: {
+        symbol: baseAsset,
+        score: ls > 0 ? ls * 2 : 0
+      },
+      quote: {
+        symbol: quoteAsset,
+        score: ls < 0 ? -ls * 2 : 0
+      }
     }
 
-    const addToSymbol = symbol => {
-      if (!acc.symbols[symbol]) acc.symbols[symbol] = 0
-      const score = acc.pairs[pair][symbol] / pairsPerSymbol[symbol].length
-      acc.symbols[symbol] += score
-      acc.totalSymbols += score
-    }
+    if (!acc.symbols[baseAsset]) acc.symbols[baseAsset] = 0
+    const baseScore = acc.pairs[pair].base.score / pairsPerSymbol[baseAsset].length
+    acc.symbols[baseAsset] += baseScore
+    acc.totalSymbols += baseScore
 
-    addToSymbol(baseAsset)
-    addToSymbol(quoteAsset)
+    if (!acc.symbols[quoteAsset]) acc.symbols[quoteAsset] = 0
+    const quoteScore = acc.pairs[pair].quote.score / pairsPerSymbol[quoteAsset].length
+    acc.symbols[quoteAsset] += quoteScore
+    acc.totalSymbols += quoteScore
 
     return acc
   }, {
     symbols: {},
-    pairs: {},
+    pairs: {} as {
+      [pair: string]: {
+        _pairScore: number,
+        base: {
+          symbol: string,
+          score: number
+        },
+        quote: {
+          symbol: string,
+          score: number
+        }
+      }
+    },
     totalSymbols: 0
   })
 
   const symbolPie = Object.entries(scores.symbols).reduce((acc, [symbol, score]: [string, number]) => {
     acc[symbol] = score / scores.totalSymbols
     return acc
-  }, {})
+  }, {} as { [symbol: string]: number })
 
   const took = Date.now() - startTime
   console.log(`symbol analysis took ${took}ms ${'|'.repeat(Math.round(took / 250))}`)
@@ -75,10 +116,10 @@ export default async (symbols: string[], pairsInfo: Symbol[] = []) => {
         [symbol: string]: number
       },
       pairs: {
-        [pair: string]: number
+        [pair: string]: PairScore
       },
       totalSymbols: number
     },
-    analysis
+    // analysis
   }
 }
