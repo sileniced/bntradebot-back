@@ -2,33 +2,86 @@ import { standardSymbols } from '../constants'
 import { Binance } from '../index'
 import SymbolAnalysis from './SymbolAnalysis'
 import {
-  Bid,
+  // Bid,
   NewOrder,
-  OrderBook,
+  // OrderBook,
   OrderSide,
   Symbol,
   SymbolLotSizeFilter,
-  SymbolMinNotionalFilter
+  SymbolMinNotionalFilter,
+  Order,
 } from 'binance-api-node'
 import IntervalAnalysis from './IntervalAnalysis'
 import newsSettings from './NewsAnalysis/settings'
 import SavedOrder from '../entities/SavedOrder'
+import NegotiationTable from './NegotiationTable'
+
+
+export interface DemandInfo {
+  symbol: string,
+  pair: string,
+  lotSize: SymbolLotSizeFilter,
+  minNotional: SymbolMinNotionalFilter,
+  side: OrderSide,
+  demandSym: number,
+  demandBtc: number,
+  alternativeProvidersPair: string[],
+  alternativeProviders: string[]
+}
+
+export interface ProviderInfo {
+  symbol: string,
+  totalSpendable: number,
+  totalSpendableBtc: number,
+  // spendableImmu: number,
+  // spendableBtcImmu: number,
+  spendable: number,
+  spendableBtc: number,
+  // total: number,
+  // weighted: number
+  involvedLength: number,
+  involvedWith: string[],
+  involvedDemands: DemandInfo[]
+  // involvedIn: OrderData[],
+}
+
+export interface Negotiation {
+  pair: string,
+  side: string,
+  price: number,
+  qtyBase: number,
+  qtyQuote: number
+}
+
+export interface Candidate {
+  [pair: string]: {
+    _pairScore: number,
+    pairInfo: Symbol,
+    buy: number,
+    sell: number
+  }
+}
 
 export interface TradeBot {
   data: {
-    ordersResult: SavedOrder[];
-    orderPairs: {
-      side: OrderSide;
-      qty: number;
-      pair: string
-    }[];
-    finalOrders: NewOrder[];
-    participatingPairs: [string, any][];
+    time: number,
+    ordersResult: SavedOrder[] | Partial<Order>[],
+    negotiationOrders: Negotiation[],
+    balance: {
+      btc: number,
+      usd: number,
+    },
+    candidateAnalysis: Candidate,
+    finalOrders: NewOrder[],
+    participatingPairs: string[],
     pieChart: ({})[]
   }
 }
 
 export default async (user): Promise<TradeBot> => {
+  const start = Date.now()
+  const avgPriceBtcUsdtPromise = Binance.getAvgPrice('BTCUSDT')
+
   const symbols = ['USDT', ...standardSymbols.toUpperCase().split(',')]
   const allPairs = await Binance.getPairs()
   const pairsInfo = allPairs.filter(pair => symbols.includes(pair.baseAsset) && symbols.includes(pair.quoteAsset))
@@ -36,47 +89,59 @@ export default async (user): Promise<TradeBot> => {
   const symbolAnalysisPromise = SymbolAnalysis(symbols, pairsInfo)
 
 
-  const allBalances = await Binance.getAccountBalances(user.id)
-  const balances = allBalances.filter(balance =>
+  const balancesUnfiltered = await Binance.getAccountBalances(user.id)
+  const balances = balancesUnfiltered.filter(balance =>
     parseFloat(balance.free) > 0 &&
     allPairs.filter(pair =>
       balance.asset === pair.baseAsset || balance.asset === pair.quoteAsset
     ).length > 0
   )
 
-  const standardBookNames = ['BTC', 'USDT']
-
-  const balanceFilteredBooks = balances.filter(({ asset }) => !standardBookNames.includes(asset))
-  const balanceBooksUnnamed = await Promise.all([...balanceFilteredBooks.map(({ asset }) => Binance.getBook(`${asset}BTC`)), Binance.getBook(standardBookNames.join(''))])
-
-  const balanceBookBtc: {
-    [symbol: string]: OrderBook
-  } = balanceBooksUnnamed.reduce((acc, book, idx) => {
-    acc[balanceFilteredBooks[idx] ? balanceFilteredBooks[idx].asset : standardBookNames[1]] = book
+  const avgPricesBtcNames: string[] = balances.map(balance => balance.asset).filter(symbol => symbol !== 'BTC' && symbol !== 'USDT')
+  const avgPricesBtcUnnamed = await Promise.all(avgPricesBtcNames.map(symbol => Binance.getAvgPrice(`${symbol}BTC`)))
+  const avgPricesBtc = avgPricesBtcNames.reduce((acc, pair, idx) => {
+    acc[pair] = avgPricesBtcUnnamed[idx]
     return acc
   }, {})
+  const avgPriceBtcUsdt = await avgPriceBtcUsdtPromise
+  avgPricesBtc['BTC'] = 1
+  avgPricesBtc['USDT'] = 1 / avgPriceBtcUsdt
 
-  function getBtcValue(balance: number, book: Bid[]) {
-    let page = 0
-    let btc = 0
-    while (balance > 0) {
-      const quantity = parseFloat(book[page].quantity)
-      if (quantity >= balance) {
-        btc += parseFloat(book[page].price) * balance
-        balance = 0
-      } else {
-        btc += parseFloat(book[page].price) * quantity
-        balance -= quantity
-      }
-      page++
-    }
-    return btc
-  }
+  // const standardBookNames = ['BTC', 'USDT']
+  // const balanceFilteredBooks = balances.filter(({ asset }) => !standardBookNames.includes(asset))
+  // const balanceBooksUnnamed = await Promise.all([...balanceFilteredBooks.map(({ asset }) => Binance.getBook(`${asset}BTC`)), Binance.getBook(standardBookNames.join(''))])
+  //
+  // const balanceBookBtc: {
+  //   [symbol: string]: OrderBook
+  // } = balanceBooksUnnamed.reduce((acc, book, idx) => {
+  //   acc[balanceFilteredBooks[idx] ? balanceFilteredBooks[idx].asset : standardBookNames[1]] = book
+  //   return acc
+  // }, {})
+  //
+  // function getBtcValue(balance: number, book: Bid[]) {
+  //   let page = 0
+  //   let btc = 0
+  //   while (balance > 0) {
+  //     const quantity = parseFloat(book[page].quantity)
+  //     if (quantity >= balance) {
+  //       btc += parseFloat(book[page].price) * balance
+  //       balance = 0
+  //     } else {
+  //       btc += parseFloat(book[page].price) * quantity
+  //       balance -= quantity
+  //     }
+  //     page++
+  //   }
+  //   return btc
+  // }
 
   const balancesBtc = balances.map(balance => ({
     ...balance,
     free: parseFloat(balance.free),
-    btcValue: balance.asset === 'BTC' ? parseFloat(balance.free) : getBtcValue(parseFloat(balance.free), balanceBookBtc[balance.asset].bids)
+    // btcValue: balance.asset === 'BTC'
+    //   ? parseFloat(balance.free)
+    //   : getBtcValue(parseFloat(balance.free), balanceBookBtc[balance.asset].bids)
+    btcValue: parseFloat(balance.free) * avgPricesBtc[balance.asset]
   }))
 
   const totalBtcValue = balancesBtc.reduce((acc, balance) => acc + balance.btcValue, 0)
@@ -94,47 +159,53 @@ export default async (user): Promise<TradeBot> => {
     locked: string;
   }
 
-  const balancesDenormalizedBtc = balancesPercentages.reduce((acc, balance: BalancesBtc) => {
+  const balancesNormalizedBtc = balancesPercentages.reduce((acc, balance: BalancesBtc) => {
     acc[balance.asset] = balance
     return acc
   }, {} as { [symbol: string]: BalancesBtc })
 
-  const balancesDenormalized = balancesPercentages.reduce((acc, balance) => {
+  const balancesNormalized = balancesPercentages.reduce((acc, balance) => {
     acc[balance.asset] = balance.percentage
     return acc
   }, {})
 
-  const symbolsFilteredBooks = symbols.filter(symbol => !standardBookNames.includes(symbol) && !balanceFilteredBooks.filter(balance => balance.asset === symbol).length)
-  const symbolBooksUnnamed = await Promise.all(symbolsFilteredBooks.map(symbol => Binance.getBook(`${symbol}BTC`)))
+  const avgPricesBtcRestNames = symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol) && !avgPricesBtcNames.filter(balance => balance === symbol).length)
+  const avgPricesBtcRestUnnamed = await Promise.all(avgPricesBtcRestNames.map(symbol => Binance.getAvgPrice(`${symbol}BTC`)))
+  avgPricesBtcRestNames.forEach((symbol, idx) => {
+    avgPricesBtc[symbol] = avgPricesBtcRestUnnamed[idx]
+  })
 
-  const symbolBooksBtc: {
-    [symbol: string]: OrderBook
-  } = {
-    ...balanceBookBtc,
-    ...symbolBooksUnnamed.reduce((acc, book, idx) => {
-      acc[symbolsFilteredBooks[idx]] = book
-      return acc
-    }, {})
-  }
+  // const symbolsFilteredBooks = symbols.filter(symbol => !standardBookNames.includes(symbol) && !balanceFilteredBooks.filter(balance => balance.asset === symbol).length)
+  // const symbolBooksUnnamed = await Promise.all(symbolsFilteredBooks.map(symbol => Binance.getBook(`${symbol}BTC`)))
+  //
+  // const symbolBooksBtc: {
+  //   [symbol: string]: OrderBook
+  // } = {
+  //   ...balanceBookBtc,
+  //   ...symbolBooksUnnamed.reduce((acc, book, idx) => {
+  //     acc[symbolsFilteredBooks[idx]] = book
+  //     return acc
+  //   }, {})
+  // }
 
   const symbolAnalysis = await symbolAnalysisPromise
 
-  function getSymbolAmount(balance: number, book: Bid[]) {
-    let page = 0
-    let amount = 0
-    while (balance > 0) {
-      const quantity = parseFloat(book[page].quantity) * parseFloat(book[page].price)
-      if (quantity >= balance) {
-        amount += parseFloat(book[page].quantity) * balance / quantity
-        balance = 0
-      } else {
-        amount += parseFloat(book[page].quantity)
-        balance -= quantity
-      }
-      page++
-    }
-    return amount
-  }
+  // function getSymbolAmount(balance: number, book: Bid[]) {
+  //   let page = 0
+  //   let amount = 0
+  //   while (balance > 0) {
+  //     const quantity = parseFloat(book[page].quantity) * parseFloat(book[page].price)
+  //     if (quantity >= balance) {
+  //       amount += parseFloat(book[page].quantity) * balance / quantity
+  //       balance = 0
+  //     } else {
+  //       amount += parseFloat(book[page].quantity)
+  //       balance -= quantity
+  //     }
+  //     page++
+  //   }
+  //   return amount
+  // }
 
   const {
     percentDifferences,
@@ -143,13 +214,13 @@ export default async (user): Promise<TradeBot> => {
     symbolAmount,
     marketArr
   } = Object.entries(symbolAnalysis.symbolPie).reduce((acc, [symbol, percentage]: [string, number]) => {
-    acc.percentDifferences[symbol] = !balancesDenormalized[symbol] ? percentage : percentage - balancesDenormalized[symbol]
+    acc.percentDifferences[symbol] = !balancesNormalized[symbol] ? percentage : percentage - balancesNormalized[symbol]
     const bs = acc.percentDifferences[symbol] < 0 ? 'sell' : 'buy'
     // acc.btcAmount[symbol] = percentage * totalBtcValue
     acc.btcDifference[bs][symbol] = Math.abs(acc.percentDifferences[symbol] * totalBtcValue)
     acc.symbolAmount[bs][symbol] = symbol === 'BTC'
       ? Math.abs(acc.percentDifferences[symbol] * totalBtcValue)
-      : getSymbolAmount(acc.btcDifference[bs][symbol], symbolBooksBtc[symbol].asks)
+      : acc.btcDifference[bs][symbol] / avgPricesBtc[symbol]
     acc.marketArr[bs].push(symbol)
     return acc
   }, {
@@ -160,30 +231,24 @@ export default async (user): Promise<TradeBot> => {
     percentDifferences: {}
   })
 
-  const markets = marketArr.sell.reduce((acc, sellSymbol) => {
-    if (!acc[sellSymbol]) acc[sellSymbol] = {}
+  const candidatePairs = marketArr.sell.reduce((acc, sellSymbol) => {
     marketArr.buy.forEach(buySymbol => {
       pairsInfo.forEach(pair => {
         if ((pair.quoteAsset === sellSymbol && pair.baseAsset === buySymbol) || (pair.baseAsset === sellSymbol && pair.quoteAsset === buySymbol)) {
-          acc[sellSymbol][buySymbol] = pair
+          acc.push(pair.symbol)
         }
       })
     })
     return acc
-  }, {})
+  }, [] as string[])
 
   /*
   todo: are all symbols represented? what about double transactions
    */
 
-  const newSymbolAnalysis = await Promise.all(Object.entries(markets).reduce((acc, [, buySymbols]) => {
-    Object.entries(buySymbols).forEach(([, pair]: [string, Symbol]) => {
-      acc.push(IntervalAnalysis(pair.symbol))
-    })
-    return acc
-  }, [] as Promise<{ [pair: string]: { _score: number } }>[]))
+  const candidateAnalysisWithoutNews = await Promise.all(candidatePairs.map(pair => IntervalAnalysis(pair)))
 
-  const newSymbolAnalysisWithNews = newSymbolAnalysis.reduce((acc, pairScore) => {
+  const candidateAnalysis = candidateAnalysisWithoutNews.reduce((acc, pairScore) => {
     Object.entries(pairScore).forEach(([pair, { _score }]: [string, { _score: number }]) => {
       const score = (_score / newsSettings.newsDivider * (newsSettings.newsDivider - 1)) + (symbolAnalysis.analysis.news[pair] / newsSettings.newsDivider)
       const ls = (score - 1 / 2)
@@ -195,17 +260,10 @@ export default async (user): Promise<TradeBot> => {
       }
     })
     return acc
-  }, {} as {
-    [pair: string]: {
-      _pairScore: number,
-      pairInfo: Symbol,
-      buy: number,
-      sell: number
-    }
-  })
+  }, {} as Candidate)
 
   interface OrderData {
-    prototype: NewOrder,
+    // prototype: NewOrder,
     extra?: any,
     pair: string,
     side: OrderSide,
@@ -217,10 +275,12 @@ export default async (user): Promise<TradeBot> => {
     pairInfo: Symbol
   }
 
-  const participatingPairs = Object.entries(newSymbolAnalysisWithNews).filter(([, { buy, sell, pairInfo }]) => !(((buy > 0 && sell === 0) && (!symbolAmount.buy[pairInfo.baseAsset] || !symbolAmount.sell[pairInfo.quoteAsset])) || ((sell > 0 && buy === 0) && (!symbolAmount.buy[pairInfo.quoteAsset] || !symbolAmount.sell[pairInfo.baseAsset]))))
+  const participatingPairs = Object.entries(candidateAnalysis).filter(([, { buy, sell, pairInfo }]) => !(((buy > 0 && sell === 0) && (!symbolAmount.buy[pairInfo.baseAsset] || !symbolAmount.sell[pairInfo.quoteAsset])) || ((sell > 0 && buy === 0) && (!symbolAmount.buy[pairInfo.quoteAsset] || !symbolAmount.sell[pairInfo.baseAsset]))))
 
-  const orderBooksNames = participatingPairs.map(([, { pairInfo: { symbol } }]) => symbol)
-  const orderBooksUnnamedPromise = Promise.all(orderBooksNames.map(pair => Binance.getBook(pair)))
+  const avgPricesOrdersNames = participatingPairs.map(([, { pairInfo: { symbol } }]) => symbol)
+  const avgPricesOrdersUnnamedPromises = Promise.all(avgPricesOrdersNames.map(pair => Binance.getAvgPrice(pair)))
+  // const orderBooksNames = participatingPairs.map(([, { pairInfo: { symbol } }]) => symbol)
+  // const orderBooksUnnamedPromise = Promise.all(orderBooksNames.map(pair => Binance.getBook(pair)))
 
   const orderPairs = participatingPairs.map(([, { buy, sell, pairInfo }]): OrderData => {
 
@@ -233,12 +293,12 @@ export default async (user): Promise<TradeBot> => {
     // const participating = participatingPairs.filter(([, { pairInfo: pairInfo2 }]) => pairInfo[bqBuy] === pairInfo2.baseAsset || pairInfo[bqBuy] === pairInfo2.quoteAsset)
 
     return {
-      prototype: {
-        symbol: pairInfo.symbol,
-        side: buy > 0 && sell === 0 ? 'BUY' : 'SELL',
-        type: 'MARKET',
-        quantity: symbolAmount[bqBase][pairInfo.baseAsset]
-      },
+      // prototype: {
+      //   symbol: pairInfo.symbol,
+      //   side: buy > 0 && sell === 0 ? 'BUY' : 'SELL',
+      //   type: 'MARKET',
+      //   quantity: symbolAmount[bqBase][pairInfo.baseAsset]
+      // },
       // extra: {
       //   'what_you_want': pairInfo[bqBuy],
       //   'how_much_you_want_of_it': symbolAmount.buy[pairInfo[bqBuy]],
@@ -261,34 +321,6 @@ export default async (user): Promise<TradeBot> => {
     }
   })
 
-  interface DemandInfo {
-    symbol: string,
-    pair: string,
-    lotSize: SymbolLotSizeFilter,
-    minNotional: SymbolMinNotionalFilter,
-    side: OrderSide,
-    demandSym: number,
-    demandBtc: number,
-    alternativeProvidersPair: string[],
-    alternativeProviders: string[]
-  }
-
-  interface ProviderInfo {
-    symbol?: string,
-    totalSpendable: number,
-    totalSpendableBtc: number,
-    spendableImmu: number,
-    spendableBtcImmu: number,
-    spendable: number,
-    spendableBtc: number,
-    total: number,
-    weighted: number
-    involvedLength: number,
-    involvedWith: string[],
-    involvedDemands: DemandInfo[]
-    // involvedIn: OrderData[],
-  }
-
   const ordersTotal = orderPairs.reduce((acc, order: OrderData) => {
     const side = order.side === 'BUY'
     const bqSell = side ? 'quoteAsset' : 'baseAsset'
@@ -300,14 +332,11 @@ export default async (user): Promise<TradeBot> => {
     if (!acc.sell[order.pairInfo[bqSell]]) {
       const involved = orderPairs.filter(orderPair => order.pairInfo[bqSell] === orderPair.pairInfo.quoteAsset || order.pairInfo[bqSell] === orderPair.pairInfo.baseAsset)
       acc.sell[order.pairInfo[bqSell]] = {
-        totalSpendable: balancesDenormalizedBtc[order.pairInfo[bqSell]].free,
-        totalSpendableBtc: balancesDenormalizedBtc[order.pairInfo[bqSell]].btcValue,
-        spendableImmu: symbolAmount.sell[order.pairInfo[bqSell]],
-        spendableBtcImmu: btcDifference.sell[order.pairInfo[bqSell]],
+        symbol: order.pairInfo[bqSell],
+        totalSpendable: balancesNormalizedBtc[order.pairInfo[bqSell]].free,
+        totalSpendableBtc: balancesNormalizedBtc[order.pairInfo[bqSell]].btcValue,
         spendable: symbolAmount.sell[order.pairInfo[bqSell]],
         spendableBtc: btcDifference.sell[order.pairInfo[bqSell]],
-        total: 0,
-        weighted: 0,
         involvedLength: involved.length,
         involvedWith: involved.map(involvedOrder => involvedOrder.pairInfo[bqBuy]),
         involvedDemands: involved.map(involvedOrder => {
@@ -341,10 +370,7 @@ export default async (user): Promise<TradeBot> => {
     //   }
     // }
 
-    acc.sell[order.pairInfo[bqSell]].total += order[bqSellBtc]
-    acc.sell[order.pairInfo[bqSell]].weighted += order[bqSellBtc] / acc.sell[order.pairInfo[bqSell]].involvedLength
-    // acc.buy[order.pairInfo[bqBuy]].total += order[bqBuyBtc]
-    // acc.buy[order.pairInfo[bqBuy]].weighted += order[bqBuyBtc] / acc.buy[order.pairInfo[bqBuy]].involvedLength
+
     return acc
   }, {
     sell: {} as {
@@ -361,64 +387,68 @@ export default async (user): Promise<TradeBot> => {
     // }
   })
 
-  const orderBooksUnnamed = await orderBooksUnnamedPromise
-  const orderBooks = orderBooksNames.reduce((acc, pair, idx) => {
-    acc[pair] = orderBooksUnnamed[idx]
+  const avgPricesOrdersUnnamed = await avgPricesOrdersUnnamedPromises
+  const avgPricesOrders = avgPricesOrdersNames.reduce((acc, pair, idx) => {
+    acc[pair] = avgPricesOrdersUnnamed[idx]
     return acc
   }, {})
 
-  function getNotionalAmount(pair, side, balance): number {
-    // todo: BUGGY BUGGY BUGGY BUGGY BUGGY BUGGY
-    // todo: I need to find out if it's either 'asks' or 'bids' at the 'BUY' side
-    const book = orderBooks[pair][side === 'BUY' ? 'asks' : 'bids']
-    let page = 0
-    let amount = 0
-    if (side === 'BUY') {
+  // const orderBooksUnnamed = await orderBooksUnnamedPromise
+  // const orderBooks = orderBooksNames.reduce((acc, pair, idx) => {
+  //   acc[pair] = orderBooksUnnamed[idx]
+  //   return acc
+  // }, {})
 
-      while (balance > 0) {
-        const quantity = parseFloat(book[page].quantity)
-        if (quantity >= balance) {
-          amount += parseFloat(book[page].price) * balance
-          balance = 0
-        } else {
-          amount += parseFloat(book[page].price) * quantity
-          balance -= quantity
-        }
-        page++
-      }
-
-    } else {
-
-      while (balance > 0) {
-        const quantity = parseFloat(book[page].quantity) * parseFloat(book[page].price)
-        if (quantity >= balance) {
-          amount += parseFloat(book[page].quantity) * balance / quantity
-          balance = 0
-        } else {
-          amount += parseFloat(book[page].quantity)
-          balance -= quantity
-        }
-        page++
-      }
-
-    }
-
-    console.error('CRITICAL BUG, why arent you going after it')
-    console.log('pair, side, balance, amount, page = ', pair, side, balance, amount, page)
-    return amount
-  }
+  // function getNotionalAmount(pair, side, balance): number {
+  //   // todo: BUGGY BUGGY BUGGY BUGGY BUGGY BUGGY
+  //   // todo: I need to find out if it's either 'asks' or 'bids' at the 'BUY' side
+  //   const book = orderBooks[pair][side === 'BUY' ? 'asks' : 'bids']
+  //   let page = 0
+  //   let amount = 0
+  //   if (side === 'BUY') {
+  //
+  //     while (balance > 0) {
+  //       const quantity = parseFloat(book[page].quantity)
+  //       if (quantity >= balance) {
+  //         amount += parseFloat(book[page].price) * balance
+  //         balance = 0
+  //       } else {
+  //         amount += parseFloat(book[page].price) * quantity
+  //         balance -= quantity
+  //       }
+  //       page++
+  //     }
+  //
+  //   } else {
+  //
+  //     while (balance > 0) {
+  //       const quantity = parseFloat(book[page].quantity) * parseFloat(book[page].price)
+  //       if (quantity >= balance) {
+  //         amount += parseFloat(book[page].quantity) * balance / quantity
+  //         balance = 0
+  //       } else {
+  //         amount += parseFloat(book[page].quantity)
+  //         balance -= quantity
+  //       }
+  //       page++
+  //     }
+  //
+  //   }
+  //
+  //   console.error('CRITICAL BUG, why arent you going after it')
+  //   console.log('pair, side, balance, amount, page = ', pair, side, balance, amount, page)
+  //   return amount
+  // }
 
   function getFinalOrders() {
-    let providersMutable = Object.entries(ordersTotal.sell).map(([provider, providerInfo]): ProviderInfo => ({
-      symbol: provider,
-      ...providerInfo
-    }))
+    let providersMutable: ProviderInfo[] = Object.entries(ordersTotal.sell).map(([, providerInfo]): ProviderInfo => providerInfo)
 
     providersMutable.sort((a, b) => b.spendableBtc - a.spendableBtc).forEach(provider => {
       provider.involvedDemands.sort((a, b) => b.demandBtc - a.demandBtc)
     })
 
     let finalOrders: NewOrder[] = []
+    let negotiationOrders: Negotiation[] = []
 
     function parseQuantity(qty: number, stepSize: string) {
       const size = parseFloat(stepSize)
@@ -434,12 +464,20 @@ export default async (user): Promise<TradeBot> => {
             ? parseQuantity(demand.demandSym, demand.lotSize.stepSize)
             : parseQuantity(provider.spendable * (demand.demandBtc / provider.spendableBtc), demand.lotSize.stepSize)
 
-          const notationalAmount = getNotionalAmount(demand.pair, demand.side, quantity)
+          const notionalAmount = quantity * avgPricesOrders[demand.pair]
+
+          negotiationOrders.push({
+            pair: demand.pair,
+            side: demand.side,
+            price: avgPricesOrders[demand.pair],
+            qtyBase: quantity,
+            qtyQuote: notionalAmount
+          })
 
           if (
             (quantity >= parseFloat(demand.lotSize.minQty))
-            && (notationalAmount >= parseFloat(demand.minNotional.minNotional))
-            && (demand.side === 'BUY' ? notationalAmount < provider.totalSpendable : demand.demandSym < provider.totalSpendable)
+            && (notionalAmount >= parseFloat(demand.minNotional.minNotional))
+            && (demand.side === 'BUY' ? notionalAmount < provider.totalSpendable : demand.demandSym < provider.totalSpendable)
           ) {
             finalOrders.push({
               symbol: demand.pair,
@@ -464,7 +502,15 @@ export default async (user): Promise<TradeBot> => {
             ? parseQuantity(demand.demandSym * (provider.spendableBtc / demand.demandBtc), demand.lotSize.stepSize)
             : parseQuantity(provider.spendable, demand.lotSize.stepSize)
 
-          const notionalAmount = getNotionalAmount(demand.pair, demand.side, quantity)
+          const notionalAmount = quantity * avgPricesOrders[demand.pair]
+
+          negotiationOrders.push({
+            pair: demand.pair,
+            side: demand.side,
+            price: avgPricesOrders[demand.pair],
+            qtyBase: quantity,
+            qtyQuote: notionalAmount
+          })
 
           if ((quantity >= parseFloat(demand.lotSize.minQty))
             && (notionalAmount >= parseFloat(demand.minNotional.minNotional))
@@ -514,24 +560,34 @@ export default async (user): Promise<TradeBot> => {
         })
       }
     })
-    return finalOrders
+    return { finalOrders, negotiationOrders }
   }
 
-  const finalOrders = getFinalOrders()
+  const { finalOrders, negotiationOrders } = getFinalOrders()
+  const { final, negotiations } = NegotiationTable(avgPricesOrders, )
 
   const ordersResult = await Promise.all(finalOrders.map(newOrder => Binance.newOrder(user, newOrder)))
 
+
+
   return {
     data: {
+      time: Date.now() - start,
       ordersResult,
       finalOrders,
       // orderBooks,
-      orderPairs: orderPairs.map(order => ({
-        pair: order.pair,
-        side: order.side,
-        qty: order.side === 'BUY' ? order.baseSymbolAmount : order.quotSymbolAmount
-      })),
-      participatingPairs,
+      // orderPairs: orderPairs.map(order => ({
+      //   pair: order.pair,
+      //   side: order.side,
+      //   qty: order.side === 'BUY' ? order.baseSymbolAmount : order.quotSymbolAmount
+      // })),
+      negotiationOrders,
+      participatingPairs: participatingPairs.map(([pair]) => pair),
+      candidateAnalysis,
+      balance: {
+        btc: totalBtcValue,
+        usd: totalBtcValue * avgPriceBtcUsdt
+      },
       // newSymbolAnalysisWithNews,
       // newSymbolAnalysis,
 
@@ -540,7 +596,7 @@ export default async (user): Promise<TradeBot> => {
       // btcDifference,
 
       // btcAmount,
-      pieChart: [symbolAnalysis.symbolPie, percentDifferences]
+      pieChart: [balancesNormalized, symbolAnalysis.symbolPie, percentDifferences]
       // balances: balancesPercentages,
       // analysis: symbolAnalysis
     }

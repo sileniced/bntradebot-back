@@ -6,7 +6,7 @@ import binance, {
   OrderBook,
   NewOrder,
   Order,
-  OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill
+  OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill, AvgPriceResult
 } from 'binance-api-node'
 import User from '../entities/User'
 import tradebot, { TradeBot } from './TradeBot'
@@ -31,8 +31,6 @@ interface realOrder {
 }
 
 
-
-
 class BinanceApi {
 
   public api: Binance
@@ -41,30 +39,41 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: 1000 * 10
+    globalTradeInterval: 1000 * 60 * 15
   }
 
   private readonly beautifulLog = (result: TradeBot) => [
-  `
+    `
   
   tradeinterval: ${this.settings.globalTradeInterval / 1000 / 60}m
   bugs: getNotionalAmount()
+  performance: ${result.data.time}ms
   time: ${new Date()}
+  
+    balance: BTC: ${result.data.balance.btc.toFixed(8)} - USD: $${result.data.balance.usd.toFixed(4)}
+  
+  Symbol Pie:
+  `,
+    `
+  
+  Candidate Analysis:
+  `,
+    `
   
   Participating Pairs: 
   ${result.data.participatingPairs.toString()}
   
-  Order Pairs:
+  Negotiation Orders:
   `,
-  `
+    `
   
   Final Orders: 
   `,
-  `
+    `
   
   Order Result: 
   `
-    ]
+  ]
 
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
@@ -73,10 +82,14 @@ class BinanceApi {
       tradebot(this.activeTradeBotUsers[id]).then(result => {
         const log = this.beautifulLog(result)
         console.log(log[0])
-        console.table(result.data.orderPairs)
+        console.table(result.data.pieChart)
         console.log(log[1])
-        console.table(result.data.finalOrders)
+        console.table(result.data.candidateAnalysis)
         console.log(log[2])
+        console.table(result.data.negotiationOrders)
+        console.log(log[3])
+        console.table(result.data.finalOrders)
+        console.log(log[4])
         console.table(result.data.ordersResult)
 
       })
@@ -110,6 +123,15 @@ class BinanceApi {
 
   public getTime = (): Promise<number> => this.api.time()
   public getPairs = (): Promise<Symbol[]> => this.exchangeInfo.then(ExchangeInfo => ExchangeInfo.symbols)
+  public getAvgPrice = (symbol): Promise<number> => this.api.avgPrice({ symbol })
+  .then((avgPrice: AvgPriceResult): number => {
+    return parseFloat({}.toString.call(avgPrice) == '[object Array]' ? avgPrice[0].price : avgPrice.price)
+  })
+  .catch(error => {
+    console.error(symbol, error)
+    return error
+  })
+
   public getBook = (symbol): Promise<OrderBook> => this.api.book({ symbol })
 
   public checkAuthenticatedApi = (userId: number): boolean => !!this.authenticatedApi[userId]
@@ -132,13 +154,15 @@ class BinanceApi {
       executedQty: parseFloat(result.executedQty),
       cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty)
     })
+    .save()
   )
   .catch(error => {
     console.error(error)
     return error
   })
 
-  public newOrderTest = (userId: number, order: NewOrder): Promise<Order> => this.authenticatedApi[userId].orderTest(order).catch(error => {
+  public newOrderTest = (userId: number, order: NewOrder): Promise<Order> => this.authenticatedApi[userId].orderTest(order)
+  .catch(error => {
     console.error(error)
     return error
   })

@@ -22,13 +22,13 @@ class SavedOrder extends BaseEntity {
   @Column('text', { nullable: false })
   public side: string
 
-  @Column('integer', { nullable: false })
+  @Column('bigint', { nullable: false })
   public transactTime: number
 
-  @Column('integer', { nullable: false })
+  @Column('decimal', { nullable: false })
   public executedQty: number
 
-  @Column('integer', { nullable: false })
+  @Column('decimal', { nullable: false })
   public cummulativeQuoteQty: number
 }
 
