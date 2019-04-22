@@ -31,6 +31,7 @@ export interface NegotiationTableInput {
   providers: Provider[],
   collectors: Collector[],
   dropPair: (candidatePair: ParticipatingPair, reason: string) => boolean
+  addToFinalPairs: (order: NewOrder, btcValue: number) => void
 }
 
 function parseStepSize(qty: number, stepSize: number) {
@@ -41,6 +42,7 @@ class NegotiationTable {
 
   private readonly pairs: ParticipatingPair[] = []
   private readonly dropPair: (pair: ParticipatingPair, reason: string) => boolean
+  private readonly addToFinalPairs: (order: NewOrder, btcValue: number) => void
 
   private providerFundsBtc: { [providerSymbol: string]: number } = {}
   private providerFunds: { [providerSymbol: string]: number } = {}
@@ -50,9 +52,10 @@ class NegotiationTable {
   private collectorAmountBtc: { [collectorSymbol: string]: number } = {}
   private collectorAmount: { [collectorSymbol: string]: number } = {}
 
-  constructor({ participatingPairs, providers, collectors, dropPair }: NegotiationTableInput) {
+  constructor({ participatingPairs, providers, collectors, dropPair, addToFinalPairs }: NegotiationTableInput) {
     this.pairs = participatingPairs
     this.dropPair = dropPair
+    this.addToFinalPairs = addToFinalPairs
 
     providers.forEach(provider => {
       this.providerFundsBtc[provider.symbol] = provider.spendableBtc
@@ -79,12 +82,12 @@ class NegotiationTable {
               const quoteAmount = baseAmount * pair.price // provider
               if (baseAmount > pair.minBase) {
                 if (quoteAmount > pair.minQuote) {
-                  finalPairs.push({
+                  this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
                     quantity: baseAmount.toString(),
                     type: 'MARKET'
-                  })
+                  }, collectorAmountBtc)
                   this.providerFundsBtc[pair.provider.symbol] -= collectorAmountBtc
                   this.providerFunds[pair.provider.symbol] -= quoteAmount
                   this.collectorAmountBtc[pair.collector.symbol] = 0
@@ -96,12 +99,12 @@ class NegotiationTable {
               const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // provider
               if (baseAmount > pair.minBase) {
                 if (quoteAmount > pair.minQuote) {
-                  finalPairs.push({
+                  this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
                     quantity: baseAmount.toString(),
                     type: 'MARKET'
-                  })
+                  }, collectorAmountBtc)
                   this.providerFundsBtc[pair.provider.symbol] -= collectorAmountBtc
                   this.providerFunds[pair.provider.symbol] -= baseAmount
                   this.collectorAmountBtc[pair.collector.symbol] = 0
@@ -115,12 +118,12 @@ class NegotiationTable {
               const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // collector
               if (baseAmount > pair.minBase) {
                 if (quoteAmount > pair.minQuote) {
-                  finalPairs.push({
+                  this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
                     quantity: baseAmount.toString(),
                     type: 'MARKET'
-                  })
+                  }, providerFundsBtc)
                   this.collectorAmountBtc[pair.collector.symbol] -= providerFundsBtc
                   this.collectorAmount[pair.collector.symbol] -= quoteAmount
                   this.providerFundsBtc[pair.provider.symbol] = 0
@@ -132,12 +135,12 @@ class NegotiationTable {
               const quoteAmount = baseAmount * pair.price // collector
               if (baseAmount > pair.minBase) {
                 if (quoteAmount > pair.minQuote) {
-                  finalPairs.push({
+                  this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
                     quantity: baseAmount.toString(),
                     type: 'MARKET'
-                  })
+                  }, providerFundsBtc)
                   this.collectorAmountBtc[pair.collector.symbol] -= providerFundsBtc
                   this.collectorAmount[pair.collector.symbol] -= baseAmount
                   this.providerFundsBtc[pair.provider.symbol] = 0

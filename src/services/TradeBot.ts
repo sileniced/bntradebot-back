@@ -74,7 +74,7 @@ class TradeBot {
   private participatingPairs: ParticipatingPair[] = []
   private negotiationTable: NegotiationTable
 
-  private finalPairs: NewOrder[] = []
+  private finalPairs: { order: NewOrder, feeDollars: number }[] = []
   private orderResult: SavedOrder[] = []
 
   constructor(user: User) {
@@ -97,6 +97,13 @@ class TradeBot {
     }
     if (pairScore) this.DroppedPairs[pair.pair].pairScore = pairScore
     return false
+  }
+
+  public addToFinalPairs = (order: NewOrder, btcValue: number) => {
+    this.finalPairs.push({
+      order,
+      feeDollars: btcValue * 0.075 * this.prices['BTCUSDT']
+    })
   }
 
   public async run() {
@@ -235,8 +242,8 @@ class TradeBot {
         if (candidatePair.provider.spendable < candidatePair.minQuote) {
           return this.dropPair(candidatePair, 'provider.spendable < minQuote')
         }
-        if (this.analysisNew.pairAnalysisOld[candidatePair.pair].base.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysisOld[candidatePair.pair]._pairScore)
+        if (this.analysisNew.pairAnalysis[candidatePair.pair].base.score === 0) {
+          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysis[candidatePair.pair]._pairScore)
         }
       } else {
         if (candidatePair.provider.spendable < candidatePair.minBase) {
@@ -245,8 +252,8 @@ class TradeBot {
         if (candidatePair.collector.demand < candidatePair.minQuote) {
           return this.dropPair(candidatePair, 'collector.demand < minQuote')
         }
-        if (this.analysisNew.pairAnalysisOld[candidatePair.pair].quote.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysisOld[candidatePair.pair]._pairScore)
+        if (this.analysisNew.pairAnalysis[candidatePair.pair].quote.score === 0) {
+          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysis[candidatePair.pair]._pairScore)
         }
       }
       return true
@@ -261,8 +268,8 @@ class TradeBot {
     this.participatingPairs = this.candidatePairs.map(candidatePair => ({
       ...candidatePair,
       collectorScore: candidatePair.side === 'BUY'
-        ? this.analysisNew.pairAnalysisOld[candidatePair.pair].base.score
-        : this.analysisNew.pairAnalysisOld[candidatePair.pair].quote.score,
+        ? this.analysisNew.pairAnalysis[candidatePair.pair].base.score
+        : this.analysisNew.pairAnalysis[candidatePair.pair].quote.score,
       price: this.prices[candidatePair.pair]
     })).sort((a, b) => b.collectorScore - a.collectorScore)
 
@@ -273,19 +280,20 @@ class TradeBot {
       participatingPairs: this.participatingPairs,
       providers: Object.values(this.providers),
       collectors: Object.values(this.collectors),
-      dropPair: this.dropPair
+      dropPair: this.dropPair,
+      addToFinalPairs: this.addToFinalPairs
     })
 
-    this.finalPairs = this.negotiationTable.run()
+    await this.negotiationTable.run()
 
     console.log('Dropped Pairs:')
     console.table(this.DroppedPairs)
 
     if (this.finalPairs.length > 0) {
       console.log('Final Pairs:')
-      console.table(this.finalPairs)
+      console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: pair.feeDollars})))
 
-      this.orderResult = await Promise.all(this.finalPairs.map(order => Binance.newOrder(this.user, order)))
+      this.orderResult = await Promise.all(this.finalPairs.map(order => Binance.newOrder(this.user, order.feeDollars, order.order)))
 
       console.log('Order Result:')
       console.table(this.orderResult)

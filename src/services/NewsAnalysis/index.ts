@@ -1,7 +1,7 @@
 import * as request from 'superagent'
-import { Response } from 'superagent'
 import Scoring from './Scoring'
 import { CryptoPanicLink } from '../../constants'
+import { Response } from 'superagent'
 
 interface CryptoPanicPost {
   kind: string;
@@ -27,34 +27,40 @@ export default async (symbols: string[]): Promise<NewsAnalysisResult> => {
 
   const linkPage: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-  const fetchResponses: Response[] | void = await Promise.all(linkPage.map((page: number) => {
+  const fetchResponses: CryptoPanicPost[][] | void = await Promise.all(linkPage.map((page: number) => {
     return new Promise(resolve => setTimeout(() => {
-      resolve(request.get(CryptoPanicLink(symbols, page)))
+      resolve(request.get(CryptoPanicLink(symbols, page))
+      .then((response: Response):CryptoPanicPost[] => response.body.results)
+      .catch((error) => {
+        console.error(error)
+        return error
+      }))
     }, Math.floor((page - 1) / 5) * 1000))
   }))
 
-  const posts: CryptoPanicPost[] = fetchResponses.reduce((acc, response: Response) => [...acc, ...response.body.results], [])
+  const posts: CryptoPanicPost[] = fetchResponses.reduce((acc, response: CryptoPanicPost[]) => [...acc, ...response], [])
 
-  const values = posts.reduce((acc, { votes, currencies, title, published_at }: CryptoPanicPost) => {
-    const age = Date.now() - Date.parse(published_at)
-    const weightedVotes = Scoring(votes)
+  const values = posts.reduce((acc, { votes, currencies, /* title, */published_at }: CryptoPanicPost) => {
 
-    currencies.forEach(({ code }) => {
-      if (!symbols.includes(code)) return acc
+    currencies.forEach(({ code: symbol }) => {
+      if (!symbols.includes(symbol)) return acc
 
-      if (!acc.symbols[code]) {
-        acc.symbols[code] = []
-        acc._totalPostWeight[code] = 0
-        acc._totalVotes[code] = 0
-        acc._totalAges[code] = 0
+      const age = Date.now() - Date.parse(published_at)
+      const weightedVotes = Scoring(votes)
+
+      if (!acc.symbols[symbol]) {
+        acc.symbols[symbol] = []
+        acc._totalPostWeight[symbol] = 0
+        acc._totalVotes[symbol] = 0
+        acc._totalAges[symbol] = 0
       }
 
-      acc._totalPostWeight[code] += weightedVotes._postWeight
-      acc._totalVotes[code] += weightedVotes._totalVotes
-      acc._totalAges[code] += age
+      acc._totalPostWeight[symbol] += weightedVotes._postWeight
+      acc._totalVotes[symbol] += weightedVotes._totalVotes
+      acc._totalAges[symbol] += age
 
-      acc.symbols[code].push({
-        title,
+      acc.symbols[symbol].push({
+        // title,
         _weightedVotes: weightedVotes,
         age,
       })

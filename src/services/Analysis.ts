@@ -1,11 +1,11 @@
 import { CandleChartInterval, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
-import NewsAnalysis from './NewsAnalysis'
 import { Binance } from '../index'
 import Oscillators from './Oscillators'
 import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
+import AnalysisNews from './AnalysisNews'
 
 export interface PairScore {
   _pairScore: number,
@@ -31,12 +31,13 @@ export interface MarketAnalysisResult {
 
 export interface IAnalysis {
   run(): Promise<void>,
+
   apiCalls: number
   techAnalysis: { [pair: string]: number },
   techSymbolAnalysis: { [symbol: string]: number },
-  newsAnalysis: { [symbol: string]: number },
+  newsAnalysis: AnalysisNews,
   symbolPie: { [pair: string]: number }
-  pairAnalysisOld: { [pair: string]: PairScore }
+  pairAnalysis: { [pair: string]: PairScore }
 }
 
 class Analysis implements IAnalysis {
@@ -56,12 +57,12 @@ class Analysis implements IAnalysis {
   private readonly quoteSymbols: string[] = []
   private readonly pairsPerSymbol: { [symbol: string]: Symbol[] } = {}
 
-  public pairAnalysisOld: { [pair: string]: PairScore } = {}
-
   public techAnalysis: { [pair: string]: number } = {}
   public techSymbolAnalysis: { [symbol: string]: number } = {}
-  public newsAnalysis: { [symbol: string]: number }
+  // public newsAnalysis: { [symbol: string]: number }
+  public newsAnalysis: AnalysisNews
   public marketAnalysis: { [quoteSymbol: string]: MarketAnalysisResult } = {}
+  public pairAnalysis: { [pair: string]: PairScore } = {}
   public symbolPie: { [pair: string]: number } = {}
 
   private symbolTotals: { [pair: string]: number } = {}
@@ -89,8 +90,8 @@ class Analysis implements IAnalysis {
 
     this.marketAnalysis['ALTS'] = {
       score: 0,
-        multiplier: 0,
-        poweredScore: 0
+      multiplier: 0,
+      poweredScore: 0
     }
 
     const quoteSymbols = Object.entries(pairsInfo.map(pair => pair.quoteAsset)
@@ -117,7 +118,9 @@ class Analysis implements IAnalysis {
   public async run(): Promise<void> {
     const start = Date.now()
 
-    const newsAnalysis = NewsAnalysis(this.symbols)
+    // const newsAnalysis = NewsAnalysis(this.symbols)
+    this.newsAnalysis = new AnalysisNews({ symbols: this.symbols })
+    const newsAnalysisPromise = this.newsAnalysis.run()
 
     const techAnalysisPromises: Promise<[string, number]>[] = []
 
@@ -172,15 +175,8 @@ class Analysis implements IAnalysis {
       this.marketAnalysis['ALTS'].poweredScore += baseScore * baseMultiplier / this.quoteSymbols.length
     })
 
-    console.log('Market Analysis:')
-    console.table(this.marketAnalysis)
-
-    this.newsAnalysis = await newsAnalysis.then(analysis => analysis._scores) as { [symbol: string]: number }
-
-    // console.log('newsAnalysis')
-    // console.table(this.newsAnalysis)
-
     /** this.techSymbolAnalysis[symbol] = */
+    /** this.pairAnalysis[symbol] = */
     this.pairsInfo.forEach(pair => {
       const pairTechScore = this.techAnalysis[pair.symbol]
 
@@ -196,7 +192,7 @@ class Analysis implements IAnalysis {
 
       const addMarketMultiplier = symbol => this.marketAnalysis[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].multiplier
 
-      this.pairAnalysisOld[pair.symbol] = {
+      this.pairAnalysis[pair.symbol] = {
         _pairScore: pairTechScore,
         base: {
           symbol: pair.baseAsset,
@@ -209,17 +205,33 @@ class Analysis implements IAnalysis {
       }
     })
 
-    // console.log('pairAnalysisOld:')
-    // console.table(this.pairAnalysisOld)
+    // console.log('pairAnalysis:')
+    // console.table(this.pairAnalysis)
     //
     // console.log('techSymbolAnalysis:')
     // console.table(this.techSymbolAnalysis)
+
+    console.log('Market Analysis:')
+    console.table(this.marketAnalysis)
+
+    await newsAnalysisPromise
+
+    // this.newsAnalysis = await newsAnalysis.then(analysis => analysis._scores).catch(error => {
+    //   console.error(error)
+    //   return this.symbols.reduce((acc, symbol) => {
+    //     acc[symbol] = 0
+    //     return acc
+    //   }, {})
+    // }) as { [symbol: string]: number }
+
+    // console.log('newsAnalysis')
+    // console.table(this.newsAnalysis)
 
 
     this.symbols.forEach(symbol => {
       this.symbolTotals[symbol] += this.marketAnalysis[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolAnalysis[symbol] * this.symbolPieWeights.tech
-      this.symbolTotals[symbol] += (this.newsAnalysis[symbol] < 0 ? 0 : this.newsAnalysis[symbol]) * this.symbolPieWeights.news
+      this.symbolTotals[symbol] += (this.newsAnalysis.symbolAnalysis[symbol] < 0 ? 0 : this.newsAnalysis.symbolAnalysis[symbol]) * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     })
 

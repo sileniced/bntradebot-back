@@ -1,5 +1,14 @@
 import settings from './settings'
 
+export interface PostAnalysisResult {
+  _score: number,
+  _postWeight: number,
+  _totalMoodVotes: number,
+  _totalVotes: number,
+  bullish: { _total: number },
+  bearish: { _total: number }
+}
+
 export default votes => Object.entries(settings.votes.moods).reduce((postAcc, [mood, keyWeights]) => {
 
   postAcc[mood] = Object.entries(keyWeights).reduce((acc, [key, weight]) => {
@@ -24,4 +33,4 @@ export default votes => Object.entries(settings.votes.moods).reduce((postAcc, [m
   _totalVotes: 0,
   bullish: { _total: 0 },
   bearish: { _total: 0 }
-})
+} as PostAnalysisResult)

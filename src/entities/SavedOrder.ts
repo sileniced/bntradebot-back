@@ -30,6 +30,9 @@ class SavedOrder extends BaseEntity {
 
   @Column('decimal', { nullable: false })
   public cummulativeQuoteQty: number
+
+  @Column('decimal', { nullable: false })
+  public feeDollars: number
 }
 
 export default SavedOrder

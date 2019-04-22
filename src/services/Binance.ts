@@ -140,7 +140,7 @@ class BinanceApi {
   .then(result => result.balances)
 
 
-  public newOrder = (user: User, order: NewOrder): Promise<SavedOrder> => this.authenticatedApi[user.id].order(order)
+  public newOrder = (user: User, feeDollars: number, order: NewOrder): Promise<SavedOrder> => this.authenticatedApi[user.id].order(order)
   .then((result: realOrder) => SavedOrder.create({
       user,
       clientOrderId: result.clientOrderId,
@@ -149,7 +149,8 @@ class BinanceApi {
       side: result.side,
       transactTime: result.transactTime,
       executedQty: parseFloat(result.executedQty),
-      cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty)
+      cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty),
+      feeDollars
     })
     .save()
   )
