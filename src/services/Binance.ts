@@ -1,12 +1,18 @@
 import binance, {
-  Binance,
-  ExchangeInfo,
-  Symbol,
   AssetBalance,
-  OrderBook,
+  AvgPriceResult,
+  Binance,
+  CandleChartResult,
+  ExchangeInfo,
   NewOrder,
   Order,
-  OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill, AvgPriceResult, CandleChartResult
+  OrderBook,
+  OrderFill,
+  OrderSide,
+  OrderStatus,
+  OrderType,
+  Symbol,
+  TimeInForce
 } from 'binance-api-node'
 import User from '../entities/User'
 import SavedOrder from '../entities/SavedOrder'
@@ -102,13 +108,21 @@ class BinanceApi {
     return error
   })
 
-  public getCandles = (symbol, interval): Promise<CandleChartResult[]> => this.api.candles({ symbol, interval, limit: 200 })
+  public getCandles = (symbol, interval): Promise<CandleChartResult[]> => this.api.candles({
+    symbol,
+    interval,
+    limit: 200
+  })
   .catch(error => {
     console.error(error)
     return error
   })
 
-  public getCandlesStockData = (symbol, interval): Promise<StockData> => this.api.candles({ symbol, interval, limit: 200 })
+  public getCandlesStockData = (symbol, interval): Promise<StockData> => this.api.candles({
+    symbol,
+    interval,
+    limit: 200
+  })
   .then(candles => CreateStockData(candles))
   .catch(error => {
     console.error(error)
