@@ -22,12 +22,10 @@
     "outDir": "target/",
     "rootDir": "src/"
   },
-  "target": "es6",
   "lib": [
     "es2017",
     "dom",
-    "esnext.array",
-    "esnext"
+    "esnext.array"
   ],
   "include": [
     "src/**/*"
