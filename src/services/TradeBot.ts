@@ -38,6 +38,11 @@ interface DroppedPair {
   quoteAmount?: number
 }
 
+function parseStepSize(qty: any, stepSize: number = 0.00000001 ) {
+  if (typeof qty !== 'number') return qty
+  return Math.floor(qty / stepSize) / (1 / stepSize)
+}
+
 class TradeBot {
 
   // todo: get from user database ('USDT' required)
@@ -135,13 +140,13 @@ class TradeBot {
 
     console.log(
       `
-${'= '.repeat(15)}
+${'= '.repeat(30)}
     
     time: ${new Date()}
     binance calls ${this.analysis.apiCalls}
     
-    balance BTC ${this.userTotalBtc.toFixed(8)}
-    balance USD ${(this.userTotalBtc * this.prices['BTCUSDT']).toFixed(4)}
+    balance BTC ${parseStepSize(this.userTotalBtc)}
+    balance USD ${parseStepSize(this.userTotalBtc * this.prices['BTCUSDT'])}
     
 `
     )
@@ -159,7 +164,13 @@ ${'= '.repeat(15)}
     await analysisPromise
 
     console.log('Market Analysis')
-    console.table(this.analysis.marketAnalysis)
+    console.table(Object.entries(this.analysis.marketAnalysis).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = parseStepSize(amount)
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     this.symbols.forEach(symbol => {
       this.differencePercentage[symbol] = this.userBalancePercentage[symbol] - this.analysis.symbolPie[symbol]
@@ -188,20 +199,38 @@ ${'= '.repeat(15)}
     })
 
     console.log('SymbolPie:')
-    console.table({
+    console.table(Object.entries({
       ['% balance']: this.userBalancePercentage,
       ['% symbol pie']: this.analysis.symbolPie,
       ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
       ['$ difference']: dollarDifference
-    })
+    }).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = parseStepSize(amount)
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     console.log('Providers:')
-    console.table(this.providers)
+    console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     console.log('Collectors:')
-    console.table(this.collectors)
+    console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     this.pairsInfo.forEach(pairInfo => {
       if (
@@ -281,23 +310,23 @@ ${'= '.repeat(15)}
       pair: pair.pair,
       side: pair.side,
       reason: pair.reason,
-      provider: pair.provider.providerSymbol,
-      spendableBtc: pair.provider.spendableBtc,
-      fundsBtc: pair.providerFundsBtc,
-      spendable: pair.provider.spendable,
-      collector: pair.collector.collectorSymbol,
-      demandBtc: pair.collector.demandBtc,
-      amountBtc: pair.collectorAmountBtc,
-      demand: pair.collector.demand,
-      baseAmount: pair.baseAmount,
       minBase: pair.minBase,
-      quoteAmount: pair.quoteAmount,
+      baseAmount: parseStepSize(pair.baseAmount),
       minQuote: pair.minQuote,
+      quoteAmount: parseStepSize(pair.quoteAmount),
+      provider: pair.provider.providerSymbol,
+      fundsBtc: parseStepSize(pair.providerFundsBtc),
+      spendableBtc: parseStepSize(pair.provider.spendableBtc),
+      spendable: parseStepSize(pair.provider.spendable),
+      collector: pair.collector.collectorSymbol,
+      amountBtc: parseStepSize(pair.collectorAmountBtc),
+      demandBtc: parseStepSize(pair.collector.demandBtc),
+      demand: parseStepSize(pair.collector.demand),
     })))
 
     if (this.finalPairs.length > 0) {
       console.log('Final Pairs:')
-      console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: pair.feeDollars})))
+      console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars)})))
 
       this.orderResult = await Promise.all(this.finalPairs.map(order => Binance.newOrder(this.user, order.feeDollars, order.order)))
 
@@ -317,10 +346,16 @@ ${'= '.repeat(15)}
       })
 
       console.log('New Dollar Balance: ')
-      console.table({
+      console.table(Object.entries({
         ['$ old balance']: dollarBalance,
         ['$ new balance']: newDollarBalance
-      })
+      }).reduce((acc, [title, pie]) => {
+        acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+          acc[symbol] = parseStepSize(amount)
+          return acc
+        }, {})
+        return acc
+      }, {}))
     }
 
     console.log(`time: ${Date.now() - start}ms`)
