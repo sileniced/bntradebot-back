@@ -76,6 +76,6 @@ export default (data: StockData) => {
 
   return {
     _score: score,
-    analysis
+    // analysis
   }
 }

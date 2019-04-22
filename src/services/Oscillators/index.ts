@@ -23,6 +23,6 @@ export default (data: StockData) => {
 
   return {
     _score: addScores(analysis),
-    analysis
+    // analysis
   }
 }

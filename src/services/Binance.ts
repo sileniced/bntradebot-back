@@ -6,11 +6,13 @@ import binance, {
   OrderBook,
   NewOrder,
   Order,
-  OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill, AvgPriceResult
+  OrderSide, OrderStatus, TimeInForce, OrderType, OrderFill, AvgPriceResult, CandleChartResult
 } from 'binance-api-node'
 import User from '../entities/User'
 import SavedOrder from '../entities/SavedOrder'
-import TradeBotNew from './TradeBotNew'
+import TradeBot from './TradeBot'
+import CreateStockData from './CreateStockData'
+import StockData from 'technicalindicators/declarations/StockData'
 
 interface realOrder {
   clientOrderId: string;
@@ -60,7 +62,7 @@ class BinanceApi {
       //   console.table(result.data.ordersResult)
       //
       // })
-      new TradeBotNew(this.activeTradeBotUsers[id]).run()
+      new TradeBot(this.activeTradeBotUsers[id]).run()
     })
   }
 
@@ -97,6 +99,19 @@ class BinanceApi {
   })
   .catch(error => {
     console.error(symbol, error)
+    return error
+  })
+
+  public getCandles = (symbol, interval): Promise<CandleChartResult[]> => this.api.candles({ symbol, interval, limit: 200 })
+  .catch(error => {
+    console.error(error)
+    return error
+  })
+
+  public getCandlesStockData = (symbol, interval): Promise<StockData> => this.api.candles({ symbol, interval, limit: 200 })
+  .then(candles => CreateStockData(candles))
+  .catch(error => {
+    console.error(error)
     return error
   })
 

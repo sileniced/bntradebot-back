@@ -38,7 +38,7 @@ export default async (symbols: string[], pairsInfo: Symbol[] = []): Promise<ISym
 
   const pairs = pairsInfo.map(pair => pair.symbol)
 
-  const pairsPerSymbol = symbols.reduce((acc, symbol) => {
+  const pairsPerSymbol: {} = symbols.reduce((acc, symbol) => {
     acc[symbol] = []
     pairsInfo.forEach(pair => {
       if (pair.baseAsset === symbol || pair.quoteAsset === symbol) {

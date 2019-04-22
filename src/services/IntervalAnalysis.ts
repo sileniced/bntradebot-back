@@ -49,7 +49,7 @@ export default async symbol => {
       acc[name] = {
         _score: values._score * weight,
         _unWeightedScore: values._score,
-        values
+        // values
       }
       return acc
     }, {})
@@ -59,7 +59,7 @@ export default async symbol => {
     acc[intervalList[idx][0]] = {
       _score: unweightedScore * intervalList[idx][1],
       _unweightedScore: unweightedScore,
-      analysis: analysis
+      // analysis: analysis
     }
 
     return acc

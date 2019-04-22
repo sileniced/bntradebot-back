@@ -26,7 +26,7 @@ export default (data: StockData) => {
 
   return {
     _score: addScores(analysis),
-    _close: close,
-    analysis
+    // _close: close,
+    // analysis
   }
 }

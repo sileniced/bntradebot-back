@@ -17,7 +17,13 @@ interface CryptoPanicPost {
   currencies: { code: string; title: string; slug: string; url: string }[]
 }
 
-export default async (symbols: string[]) => {
+export interface NewsAnalysisResult {
+  _scores: {
+    [symbol: string]: number
+  }
+}
+
+export default async (symbols: string[]): Promise<NewsAnalysisResult> => {
 
   const linkPage: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -83,6 +89,6 @@ export default async (symbols: string[]) => {
 
   return {
     _scores: symbolScores,
-    values
+    // values
   }
 }

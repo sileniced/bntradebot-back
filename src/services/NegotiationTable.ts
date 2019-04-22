@@ -26,11 +26,11 @@ export interface Collector {
   demand: number,
 }
 
-export interface INegotiationTable {
+export interface NegotiationTableInput {
   participatingPairs: ParticipatingPair[],
   providers: Provider[],
   collectors: Collector[],
-  passPair: (candidatePair: ParticipatingPair, reason: string) => boolean
+  dropPair: (candidatePair: ParticipatingPair, reason: string) => boolean
 }
 
 function parseStepSize(qty: number, stepSize: number) {
@@ -40,7 +40,7 @@ function parseStepSize(qty: number, stepSize: number) {
 class NegotiationTable {
 
   private readonly pairs: ParticipatingPair[] = []
-  private readonly passPair: (pair: ParticipatingPair, reason: string) => boolean
+  private readonly dropPair: (pair: ParticipatingPair, reason: string) => boolean
 
   private providerFundsBtc: { [providerSymbol: string]: number } = {}
   private providerFunds: { [providerSymbol: string]: number } = {}
@@ -50,9 +50,9 @@ class NegotiationTable {
   private collectorAmountBtc: { [collectorSymbol: string]: number } = {}
   private collectorAmount: { [collectorSymbol: string]: number } = {}
 
-  constructor({ participatingPairs, providers, collectors, passPair }: INegotiationTable) {
+  constructor({ participatingPairs, providers, collectors, dropPair }: NegotiationTableInput) {
     this.pairs = participatingPairs
-    this.passPair = passPair
+    this.dropPair = dropPair
 
     providers.forEach(provider => {
       this.providerFundsBtc[provider.symbol] = provider.spendableBtc
@@ -89,8 +89,8 @@ class NegotiationTable {
                   this.providerFunds[pair.provider.symbol] -= quoteAmount
                   this.collectorAmountBtc[pair.collector.symbol] = 0
                   this.collectorAmount[pair.collector.symbol] = 0
-                } else this.passPair(pair, 'provider quote.amount < minQuote')
-              } else this.passPair(pair, 'collector base.amount < minBase')
+                } else this.dropPair(pair, 'provider quote.amount < minQuote')
+              } else this.dropPair(pair, 'collector base.amount < minBase')
             } else {
               const quoteAmount = this.collectorAmount[pair.collector.symbol] // collector
               const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // provider
@@ -106,10 +106,10 @@ class NegotiationTable {
                   this.providerFunds[pair.provider.symbol] -= baseAmount
                   this.collectorAmountBtc[pair.collector.symbol] = 0
                   this.collectorAmount[pair.collector.symbol] = 0
-                } else this.passPair(pair, 'collector quote.amount < minQuote')
-              } else this.passPair(pair, 'provider base.amount < minBase')
+                } else this.dropPair(pair, 'collector quote.amount < minQuote')
+              } else this.dropPair(pair, 'provider base.amount < minBase')
             }
-          } else {
+          } else if (providerFundsBtc < collectorAmountBtc) {
             if (pair.side === 'BUY') {
               const quoteAmount = this.providerFunds[pair.provider.symbol] // provider
               const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // collector
@@ -125,8 +125,8 @@ class NegotiationTable {
                   this.collectorAmount[pair.collector.symbol] -= quoteAmount
                   this.providerFundsBtc[pair.provider.symbol] = 0
                   this.providerFunds[pair.provider.symbol] = 0
-                } else this.passPair(pair, 'provider quote.amount < minQuote')
-              } else this.passPair(pair, 'collector base.amount < minBase')
+                } else this.dropPair(pair, 'provider quote.amount < minQuote')
+              } else this.dropPair(pair, 'collector base.amount < minBase')
             } else {
               const baseAmount = parseStepSize(this.providerFunds[pair.provider.symbol], pair.stepSize) // provider
               const quoteAmount = baseAmount * pair.price // collector
@@ -142,12 +142,12 @@ class NegotiationTable {
                   this.collectorAmount[pair.collector.symbol] -= baseAmount
                   this.providerFundsBtc[pair.provider.symbol] = 0
                   this.providerFunds[pair.provider.symbol] = 0
-                } else this.passPair(pair, 'collector quote.amount < minQuote')
-              } else this.passPair(pair, 'provider base.amount < minBase')
+                } else this.dropPair(pair, 'collector quote.amount < minQuote')
+              } else this.dropPair(pair, 'provider base.amount < minBase')
             }
           }
-        } else this.passPair(pair, 'collector amount satisfied')
-      } else this.passPair(pair, 'providerFunds dry')
+        } else this.dropPair(pair, 'collector amount satisfied')
+      } else this.dropPair(pair, 'providerFunds dry')
       return finalPairs
     }, [] as NewOrder[])
   }
