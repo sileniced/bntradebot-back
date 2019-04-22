@@ -1,7 +1,6 @@
 import User from '../entities/User'
 import { Binance } from '../index'
 import { NewOrder, OrderSide, Symbol } from 'binance-api-node'
-// import SymbolAnalysis, { ISymbolAnalysis, PairScore } from './SymbolAnalysis'
 import NegotiationTable, { Collector, ParticipatingPair, Provider } from './NegotiationTable'
 import SavedOrder from '../entities/SavedOrder'
 import Analysis from './Analysis'
@@ -22,21 +21,21 @@ interface CandidatePair {
   stepSize: number,
 }
 
-interface PassedPairs {
+interface DroppedPair {
   pair: string,
   price?: number,
   side: OrderSide,
-  providerSymbol: string,
-  providerFundsBtc: number,
-  providerFunds: number,
-  collectorSymbol: string,
-  collectorDemandBtc: number,
-  collectorDemand: number,
+  provider: Provider,
+  collector: Collector,
   pairScore?: number
   minBase: number,
   minQuote: number,
-  stepSize: number,
+  stepSize?: number,
   reason: string
+  providerFundsBtc?: number,
+  collectorAmountBtc?: number
+  baseAmount?: number
+  quoteAmount?: number
 }
 
 class TradeBot {
@@ -54,11 +53,7 @@ class TradeBot {
 
   private prices: { [pair: string]: number } = { ['BTCBTC']: 1 }
 
-  private analysisNew: Analysis
-
-  // private symbolAnalysis: ISymbolAnalysis | Promise<ISymbolAnalysis>
-  // private symbolPie: { [symbol: string]: number } = {}
-  // private pairScores: { [pair: string]: PairScore } = {}
+  private analysis: Analysis
 
   private differencePercentage: { [symbol: string]: number } = {}
   private differenceBtc: { [symbol: string]: number } = {}
@@ -69,7 +64,7 @@ class TradeBot {
   private collectors: { [symbol: string]: Collector } = {}
   private candidatePairs: CandidatePair[] = []
 
-  private DroppedPairs: { [pair: string]: PassedPairs } = {}
+  private DroppedPairs: { [pair: string]: DroppedPair } = {}
 
   private participatingPairs: ParticipatingPair[] = []
   private negotiationTable: NegotiationTable
@@ -87,12 +82,6 @@ class TradeBot {
   public dropPair = (pair: CandidatePair | ParticipatingPair, reason: string, pairScore?: number): boolean => {
     this.DroppedPairs[pair.pair] = {
       ...pair,
-      providerSymbol: pair.provider.symbol,
-      providerFundsBtc: pair.provider.spendableBtc,
-      providerFunds: pair.provider.spendable,
-      collectorSymbol: pair.collector.symbol,
-      collectorDemandBtc: pair.collector.demandBtc,
-      collectorDemand: pair.collector.demand,
       reason
     }
     if (pairScore) this.DroppedPairs[pair.pair].pairScore = pairScore
@@ -113,8 +102,8 @@ class TradeBot {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
     })
 
-    this.analysisNew = new Analysis({ pairsInfo: this.pairsInfo })
-    const symbolAnalysisNewPromise = this.analysisNew.run()
+    this.analysis = new Analysis({ pairsInfo: this.pairsInfo })
+    const analysisPromise = this.analysis.run()
 
     // this.symbolAnalysis = SymbolAnalysis(this.symbols, this.pairsInfo)
 
@@ -146,11 +135,13 @@ class TradeBot {
 
     console.log(
       `
+${'= '.repeat(15)}
     
     time: ${new Date()}
+    binance calls ${this.analysis.apiCalls}
+    
     balance BTC ${this.userTotalBtc.toFixed(8)}
     balance USD ${(this.userTotalBtc * this.prices['BTCUSDT']).toFixed(4)}
-        
     
 `
     )
@@ -159,27 +150,28 @@ class TradeBot {
       this.userBalancePercentage[symbol] = this.userBalance[symbol].amountBtc / this.userTotalBtc
     })
 
-    await symbolAnalysisNewPromise
-    // this.symbolAnalysis = await this.symbolAnalysis
-    // this.symbolPie = this.symbolAnalysis.symbolPie
-
     const providerSymbols: string[] = []
     const collectorSymbols: string[] = []
 
     const dollarSymbolPie: { [symbol: string]: number } = {}
     const dollarDifference: { [symbol: string]: number } = {}
 
+    await analysisPromise
+
+    console.log('Market Analysis')
+    console.table(this.analysis.marketAnalysis)
+
     this.symbols.forEach(symbol => {
-      this.differencePercentage[symbol] = this.userBalancePercentage[symbol] - this.analysisNew.symbolPie[symbol]
+      this.differencePercentage[symbol] = this.userBalancePercentage[symbol] - this.analysis.symbolPie[symbol]
       this.differenceBtc[symbol] = this.differencePercentage[symbol] * this.userTotalBtc
       this.difference[symbol] = this.differenceBtc[symbol] / this.prices[`${symbol}BTC`]
-      dollarSymbolPie[symbol] = this.analysisNew.symbolPie[symbol] * this.userTotalBtc * this.prices['BTCUSDT']
+      dollarSymbolPie[symbol] = this.analysis.symbolPie[symbol] * this.userTotalBtc * this.prices['BTCUSDT']
       dollarDifference[symbol] = this.differenceBtc[symbol] * this.prices['BTCUSDT']
 
       if (this.differencePercentage[symbol] > 0) {
         providerSymbols.push(symbol)
         this.providers[symbol] = {
-          symbol,
+          providerSymbol: symbol,
           spendableBtc: this.differenceBtc[symbol],
           spendable: this.difference[symbol],
           totalSpendableBtc: this.userBalance[symbol].amountBtc,
@@ -188,7 +180,7 @@ class TradeBot {
       } else if (this.differencePercentage[symbol] < 0) {
         collectorSymbols.push(symbol)
         this.collectors[symbol] = {
-          symbol,
+          collectorSymbol: symbol,
           demandBtc: -this.differenceBtc[symbol],
           demand: -this.difference[symbol]
         }
@@ -198,7 +190,7 @@ class TradeBot {
     console.log('SymbolPie:')
     console.table({
       ['% balance']: this.userBalancePercentage,
-      ['% symbol pie']: this.analysisNew.symbolPie,
+      ['% symbol pie']: this.analysis.symbolPie,
       ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
@@ -232,8 +224,6 @@ class TradeBot {
       }
     })
 
-    // this.pairScores = this.symbolAnalysis._scores.pairs
-
     this.candidatePairs = this.candidatePairs.filter(candidatePair => {
       if (candidatePair.side === 'BUY') {
         if (candidatePair.collector.demand < candidatePair.minBase) {
@@ -242,8 +232,8 @@ class TradeBot {
         if (candidatePair.provider.spendable < candidatePair.minQuote) {
           return this.dropPair(candidatePair, 'provider.spendable < minQuote')
         }
-        if (this.analysisNew.pairAnalysis[candidatePair.pair].base.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysis[candidatePair.pair]._pairScore)
+        if (this.analysis.pairAnalysis[candidatePair.pair].base.score === 0) {
+          return this.dropPair(candidatePair, 'collector.score === 0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       } else {
         if (candidatePair.provider.spendable < candidatePair.minBase) {
@@ -252,8 +242,8 @@ class TradeBot {
         if (candidatePair.collector.demand < candidatePair.minQuote) {
           return this.dropPair(candidatePair, 'collector.demand < minQuote')
         }
-        if (this.analysisNew.pairAnalysis[candidatePair.pair].quote.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysisNew.pairAnalysis[candidatePair.pair]._pairScore)
+        if (this.analysis.pairAnalysis[candidatePair.pair].quote.score === 0) {
+          return this.dropPair(candidatePair, 'collector.score === 0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       }
       return true
@@ -268,13 +258,13 @@ class TradeBot {
     this.participatingPairs = this.candidatePairs.map(candidatePair => ({
       ...candidatePair,
       collectorScore: candidatePair.side === 'BUY'
-        ? this.analysisNew.pairAnalysis[candidatePair.pair].base.score
-        : this.analysisNew.pairAnalysis[candidatePair.pair].quote.score,
+        ? this.analysis.pairAnalysis[candidatePair.pair].base.score
+        : this.analysis.pairAnalysis[candidatePair.pair].quote.score,
       price: this.prices[candidatePair.pair]
     })).sort((a, b) => b.collectorScore - a.collectorScore)
 
     console.log('Participating Pairs:')
-    console.table(this.participatingPairs)
+    console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
 
     this.negotiationTable = new NegotiationTable({
       participatingPairs: this.participatingPairs,
@@ -287,7 +277,23 @@ class TradeBot {
     await this.negotiationTable.run()
 
     console.log('Dropped Pairs:')
-    console.table(this.DroppedPairs)
+    console.table(Object.values(this.DroppedPairs).map((pair): any => ({
+      pair: pair.pair,
+      side: pair.side,
+      reason: pair.reason,
+      provider: pair.provider.providerSymbol,
+      spendableBtc: pair.provider.spendableBtc,
+      fundsBtc: pair.providerFundsBtc,
+      spendable: pair.provider.spendable,
+      collector: pair.collector.collectorSymbol,
+      demandBtc: pair.collector.demandBtc,
+      amountBtc: pair.collectorAmountBtc,
+      demand: pair.collector.demand,
+      baseAmount: pair.baseAmount,
+      minBase: pair.minBase,
+      quoteAmount: pair.quoteAmount,
+      minQuote: pair.minQuote,
+    })))
 
     if (this.finalPairs.length > 0) {
       console.log('Final Pairs:')

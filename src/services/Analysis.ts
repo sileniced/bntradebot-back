@@ -59,7 +59,6 @@ class Analysis implements IAnalysis {
 
   public techAnalysis: { [pair: string]: number } = {}
   public techSymbolAnalysis: { [symbol: string]: number } = {}
-  // public newsAnalysis: { [symbol: string]: number }
   public newsAnalysis: AnalysisNews
   public marketAnalysis: { [quoteSymbol: string]: MarketAnalysisResult } = {}
   public pairAnalysis: { [pair: string]: PairScore } = {}
@@ -118,7 +117,6 @@ class Analysis implements IAnalysis {
   public async run(): Promise<void> {
     const start = Date.now()
 
-    // const newsAnalysis = NewsAnalysis(this.symbols)
     this.newsAnalysis = new AnalysisNews({ symbols: this.symbols })
     const newsAnalysisPromise = this.newsAnalysis.run()
 
@@ -138,17 +136,12 @@ class Analysis implements IAnalysis {
       })
     })
 
-    console.log(`API calls: ${this.apiCalls}`)
-
     /** this.techAnalysis[pair] = */
     await Promise.all(techAnalysisPromises)
     .then(pairInterval => pairInterval.forEach(([pair, score]) => {
       if (!this.techAnalysis[pair]) this.techAnalysis[pair] = 0
       this.techAnalysis[pair] += score
     }))
-
-    // console.log('techAnalysis')
-    // console.table(this.techAnalysis)
 
     /** this.marketAnalysis[quoteSymbol | altsMarket] = */
     this.quoteSymbols.forEach(quoteSymbol => {
@@ -205,28 +198,7 @@ class Analysis implements IAnalysis {
       }
     })
 
-    // console.log('pairAnalysis:')
-    // console.table(this.pairAnalysis)
-    //
-    // console.log('techSymbolAnalysis:')
-    // console.table(this.techSymbolAnalysis)
-
-    console.log('Market Analysis:')
-    console.table(this.marketAnalysis)
-
     await newsAnalysisPromise
-
-    // this.newsAnalysis = await newsAnalysis.then(analysis => analysis._scores).catch(error => {
-    //   console.error(error)
-    //   return this.symbols.reduce((acc, symbol) => {
-    //     acc[symbol] = 0
-    //     return acc
-    //   }, {})
-    // }) as { [symbol: string]: number }
-
-    // console.log('newsAnalysis')
-    // console.table(this.newsAnalysis)
-
 
     this.symbols.forEach(symbol => {
       this.symbolTotals[symbol] += this.marketAnalysis[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
@@ -239,9 +211,6 @@ class Analysis implements IAnalysis {
     this.symbols.forEach(symbol => {
       this.symbolPie[symbol] = this.symbolTotals[symbol] / this.allTotals
     })
-
-    // console.log('symbolPie')
-    // console.table(this.symbolPie)
 
     console.log(`analysis time: ${Date.now() - start}ms`)
   }

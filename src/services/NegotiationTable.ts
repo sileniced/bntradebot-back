@@ -10,10 +10,14 @@ export interface ParticipatingPair {
   stepSize: number,
   minBase: number,
   minQuote: number,
+  providerFundsBtc?: number,
+  collectorAmountBtc?: number
+  baseAmount?: number
+  quoteAmount?: number
 }
 
 export interface Provider {
-  symbol: string,
+  providerSymbol: string,
   totalSpendable: number,
   totalSpendableBtc: number,
   spendable: number,
@@ -21,7 +25,7 @@ export interface Provider {
 }
 
 export interface Collector {
-  symbol: string,
+  collectorSymbol: string,
   demandBtc: number,
   demand: number,
 }
@@ -58,100 +62,99 @@ class NegotiationTable {
     this.addToFinalPairs = addToFinalPairs
 
     providers.forEach(provider => {
-      this.providerFundsBtc[provider.symbol] = provider.spendableBtc
-      this.providerFunds[provider.symbol] = provider.spendable
-      this.providerTotalFundsBtc[provider.symbol] = provider.totalSpendableBtc
-      this.providerTotalFunds[provider.symbol] = provider.totalSpendable
+      this.providerFundsBtc[provider.providerSymbol] = provider.spendableBtc
+      this.providerFunds[provider.providerSymbol] = provider.spendable
+      this.providerTotalFundsBtc[provider.providerSymbol] = provider.totalSpendableBtc
+      this.providerTotalFunds[provider.providerSymbol] = provider.totalSpendable
     })
 
     collectors.forEach(demand => {
-      this.collectorAmountBtc[demand.symbol] = demand.demandBtc
-      this.collectorAmount[demand.symbol] = demand.demand
+      this.collectorAmountBtc[demand.collectorSymbol] = demand.demandBtc
+      this.collectorAmount[demand.collectorSymbol] = demand.demand
     })
   }
 
   public run() {
-    return this.pairs.reduce((finalPairs, pair) => {
-      const providerFundsBtc = this.providerFundsBtc[pair.provider.symbol]
-      if (providerFundsBtc > 0) {
-        const collectorAmountBtc = this.collectorAmountBtc[pair.collector.symbol]
-        if (collectorAmountBtc > 0) {
-          if (providerFundsBtc > collectorAmountBtc) {
+    this.pairs.forEach(pair => {
+      pair.providerFundsBtc = this.providerFundsBtc[pair.provider.providerSymbol]
+      if (pair.providerFundsBtc > 0) {
+        pair.collectorAmountBtc = this.collectorAmountBtc[pair.collector.collectorSymbol]
+        if (pair.collectorAmountBtc > 0) {
+          if (pair.providerFundsBtc > pair.collectorAmountBtc) {
             if (pair.side === 'BUY') {
-              const baseAmount = parseStepSize(this.collectorAmount[pair.collector.symbol], pair.stepSize) // collector
-              const quoteAmount = baseAmount * pair.price // provider
-              if (baseAmount > pair.minBase) {
-                if (quoteAmount > pair.minQuote) {
+              pair.baseAmount = parseStepSize(this.collectorAmount[pair.collector.collectorSymbol], pair.stepSize) // collector
+              pair.quoteAmount = pair.baseAmount * pair.price // provider
+              if (pair.baseAmount > pair.minBase) {
+                if (pair.quoteAmount > pair.minQuote) {
                   this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
-                    quantity: baseAmount.toString(),
+                    quantity: pair.baseAmount.toString(),
                     type: 'MARKET'
-                  }, collectorAmountBtc)
-                  this.providerFundsBtc[pair.provider.symbol] -= collectorAmountBtc
-                  this.providerFunds[pair.provider.symbol] -= quoteAmount
-                  this.collectorAmountBtc[pair.collector.symbol] = 0
-                  this.collectorAmount[pair.collector.symbol] = 0
+                  }, pair.collectorAmountBtc)
+                  this.providerFundsBtc[pair.provider.providerSymbol] -= pair.collectorAmountBtc
+                  this.providerFunds[pair.provider.providerSymbol] -= pair.quoteAmount
+                  this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
+                  this.collectorAmount[pair.collector.collectorSymbol] = 0
                 } else this.dropPair(pair, 'provider quote.amount < minQuote')
               } else this.dropPair(pair, 'collector base.amount < minBase')
             } else {
-              const quoteAmount = this.collectorAmount[pair.collector.symbol] // collector
-              const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // provider
-              if (baseAmount > pair.minBase) {
-                if (quoteAmount > pair.minQuote) {
+              pair.quoteAmount = this.collectorAmount[pair.collector.collectorSymbol] // collector
+              pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize) // provider
+              if (pair.baseAmount > pair.minBase) {
+                if (pair.quoteAmount > pair.minQuote) {
                   this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
-                    quantity: baseAmount.toString(),
+                    quantity: pair.baseAmount.toString(),
                     type: 'MARKET'
-                  }, collectorAmountBtc)
-                  this.providerFundsBtc[pair.provider.symbol] -= collectorAmountBtc
-                  this.providerFunds[pair.provider.symbol] -= baseAmount
-                  this.collectorAmountBtc[pair.collector.symbol] = 0
-                  this.collectorAmount[pair.collector.symbol] = 0
+                  }, pair.collectorAmountBtc)
+                  this.providerFundsBtc[pair.provider.providerSymbol] -= pair.collectorAmountBtc
+                  this.providerFunds[pair.provider.providerSymbol] -= pair.baseAmount
+                  this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
+                  this.collectorAmount[pair.collector.collectorSymbol] = 0
                 } else this.dropPair(pair, 'collector quote.amount < minQuote')
               } else this.dropPair(pair, 'provider base.amount < minBase')
             }
-          } else if (providerFundsBtc < collectorAmountBtc) {
+          } else if (pair.providerFundsBtc < pair.collectorAmountBtc) {
             if (pair.side === 'BUY') {
-              const quoteAmount = this.providerFunds[pair.provider.symbol] // provider
-              const baseAmount = parseStepSize(quoteAmount / pair.price, pair.stepSize) // collector
-              if (baseAmount > pair.minBase) {
-                if (quoteAmount > pair.minQuote) {
+              pair.quoteAmount = this.providerFunds[pair.provider.providerSymbol] // provider
+              pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize) // collector
+              if (pair.baseAmount > pair.minBase) {
+                if (pair.quoteAmount > pair.minQuote) {
                   this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
-                    quantity: baseAmount.toString(),
+                    quantity: pair.baseAmount.toString(),
                     type: 'MARKET'
-                  }, providerFundsBtc)
-                  this.collectorAmountBtc[pair.collector.symbol] -= providerFundsBtc
-                  this.collectorAmount[pair.collector.symbol] -= quoteAmount
-                  this.providerFundsBtc[pair.provider.symbol] = 0
-                  this.providerFunds[pair.provider.symbol] = 0
+                  }, pair.providerFundsBtc)
+                  this.collectorAmountBtc[pair.collector.collectorSymbol] -= pair.providerFundsBtc
+                  this.collectorAmount[pair.collector.collectorSymbol] -= pair.quoteAmount
+                  this.providerFundsBtc[pair.provider.providerSymbol] = 0
+                  this.providerFunds[pair.provider.providerSymbol] = 0
                 } else this.dropPair(pair, 'provider quote.amount < minQuote')
               } else this.dropPair(pair, 'collector base.amount < minBase')
             } else {
-              const baseAmount = parseStepSize(this.providerFunds[pair.provider.symbol], pair.stepSize) // provider
-              const quoteAmount = baseAmount * pair.price // collector
-              if (baseAmount > pair.minBase) {
-                if (quoteAmount > pair.minQuote) {
+              pair.baseAmount = parseStepSize(this.providerFunds[pair.provider.providerSymbol], pair.stepSize) // provider
+              pair.quoteAmount = pair.baseAmount * pair.price // collector
+              if (pair.baseAmount > pair.minBase) {
+                if (pair.quoteAmount > pair.minQuote) {
                   this.addToFinalPairs({
                     symbol: pair.pair,
                     side: pair.side,
-                    quantity: baseAmount.toString(),
+                    quantity: pair.baseAmount.toString(),
                     type: 'MARKET'
-                  }, providerFundsBtc)
-                  this.collectorAmountBtc[pair.collector.symbol] -= providerFundsBtc
-                  this.collectorAmount[pair.collector.symbol] -= baseAmount
-                  this.providerFundsBtc[pair.provider.symbol] = 0
-                  this.providerFunds[pair.provider.symbol] = 0
+                  }, pair.providerFundsBtc)
+                  this.collectorAmountBtc[pair.collector.collectorSymbol] -= pair.providerFundsBtc
+                  this.collectorAmount[pair.collector.collectorSymbol] -= pair.baseAmount
+                  this.providerFundsBtc[pair.provider.providerSymbol] = 0
+                  this.providerFunds[pair.provider.providerSymbol] = 0
                 } else this.dropPair(pair, 'collector quote.amount < minQuote')
               } else this.dropPair(pair, 'provider base.amount < minBase')
             }
           }
         } else this.dropPair(pair, 'collector amount satisfied')
       } else this.dropPair(pair, 'providerFunds dry')
-      return finalPairs
     }, [] as NewOrder[])
   }
 
