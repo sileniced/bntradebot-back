@@ -208,25 +208,25 @@ class TradeBot {
         providerSymbols.push(symbol)
         this.providers[symbol] = {
           providerSymbol: symbol,
-          spendableBtc: this.differenceBtc[symbol],
-          spendable: this.difference[symbol],
-          totalSpendableBtc: this.userBalanceBtc[symbol],
-          totalSpendable: this.userBalance[symbol]
+          spendableBtc: -this.differenceBtc[symbol],
+          spendable: -this.difference[symbol],
+          totalSpendableBtc: -this.userBalanceBtc[symbol],
+          totalSpendable: -this.userBalance[symbol]
         }
       } else if (this.differencePercentage[symbol] > 0) {
         collectorSymbols.push(symbol)
         this.collectors[symbol] = {
           collectorSymbol: symbol,
-          demandBtc: -this.differenceBtc[symbol],
-          demand: -this.difference[symbol]
+          demandBtc: this.differenceBtc[symbol],
+          demand: this.difference[symbol]
         }
       }
     })
 
     generateTable('SymbolPie', {
-      ['% balance']: this.userBalancePercentage,
-      ['% symbol pie']: this.analysis.symbolPie,
-      ['% difference']: this.differencePercentage,
+      // ['% balance']: this.userBalancePercentage,
+      // ['% symbol pie']: this.analysis.symbolPie,
+      // ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
       ['$ difference']: dollarDifference
@@ -249,23 +249,23 @@ class TradeBot {
 
     // generateTable('Providers', this.providers)
     // console.log('Providers:')
-    // console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
-    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-    //     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-    //     return acc
-    //   }, {})
-    //   return acc
-    // }, {}))
+    console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     // generateTable('Collectors', this.collectors)
     // console.log('Collectors:')
-    // console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
-    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-    //     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-    //     return acc
-    //   }, {})
-    //   return acc
-    // }, {}))
+    console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
+      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+        return acc
+      }, {})
+      return acc
+    }, {}))
 
     this.pairsInfo.forEach(pairInfo => {
       if (
@@ -346,44 +346,44 @@ class TradeBot {
 
     await this.negotiationTable.run()
 
-    // generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
-    //   pair: pair.pair,
-    //   side: pair.side,
-    //   reason: pair.reason,
-    //   minBase: pair.minBase,
-    //   baseAmount: parseStepSize(pair.baseAmount),
-    //   minQuote: pair.minQuote,
-    //   quoteAmount: parseStepSize(pair.quoteAmount),
-    //   provider: pair.provider.providerSymbol,
-    //   fundsBtc: parseStepSize(pair.providerFundsBtc),
-    //   spendableBtc: parseStepSize(pair.provider.spendableBtc),
-    //   spendable: parseStepSize(pair.provider.spendable),
-    //   collector: pair.collector.collectorSymbol,
-    //   amountBtc: parseStepSize(pair.collectorAmountBtc),
-    //   demandBtc: parseStepSize(pair.collector.demandBtc),
-    //   demand: parseStepSize(pair.collector.demand)
-    // })).reduce((acc, pair) => {
-    //   acc[pair.pair] = pair
-    //   return acc
-    // }, {}))
-    // console.log('Dropped Pairs:')
-    // console.table(Object.values(this.DroppedPairs).map((pair): any => ({
-    //   pair: pair.pair,
-    //   side: pair.side,
-    //   reason: pair.reason,
-    //   minBase: pair.minBase,
-    //   baseAmount: parseStepSize(pair.baseAmount),
-    //   minQuote: pair.minQuote,
-    //   quoteAmount: parseStepSize(pair.quoteAmount),
-    //   provider: pair.provider.providerSymbol,
-    //   fundsBtc: parseStepSize(pair.providerFundsBtc),
-    //   spendableBtc: parseStepSize(pair.provider.spendableBtc),
-    //   spendable: parseStepSize(pair.provider.spendable),
-    //   collector: pair.collector.collectorSymbol,
-    //   amountBtc: parseStepSize(pair.collectorAmountBtc),
-    //   demandBtc: parseStepSize(pair.collector.demandBtc),
-    //   demand: parseStepSize(pair.collector.demand),
-    // })))
+    generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
+      pair: pair.pair,
+      side: pair.side,
+      reason: pair.reason,
+      // minBase: pair.minBase,
+      // baseAmount: parseStepSize(pair.baseAmount),
+      // minQuote: pair.minQuote,
+      // quoteAmount: parseStepSize(pair.quoteAmount),
+      // provider: pair.provider.providerSymbol,
+      // fundsBtc: parseStepSize(pair.providerFundsBtc),
+      // spendableBtc: parseStepSize(pair.provider.spendableBtc),
+      // spendable: parseStepSize(pair.provider.spendable),
+      // collector: pair.collector.collectorSymbol,
+      // amountBtc: parseStepSize(pair.collectorAmountBtc),
+      // demandBtc: parseStepSize(pair.collector.demandBtc),
+      // demand: parseStepSize(pair.collector.demand)
+    })).reduce((acc, pair) => {
+      acc[pair.pair] = pair
+      return acc
+    }, {}))
+    console.log('Dropped Pairs:')
+    console.table(Object.values(this.DroppedPairs).map((pair): any => ({
+      pair: pair.pair,
+      side: pair.side,
+      reason: pair.reason,
+      minBase: pair.minBase,
+      baseAmount: parseStepSize(pair.baseAmount),
+      minQuote: pair.minQuote,
+      quoteAmount: parseStepSize(pair.quoteAmount),
+      provider: pair.provider.providerSymbol,
+      fundsBtc: parseStepSize(pair.providerFundsBtc),
+      spendableBtc: parseStepSize(pair.provider.spendableBtc),
+      spendable: parseStepSize(pair.provider.spendable),
+      collector: pair.collector.collectorSymbol,
+      amountBtc: parseStepSize(pair.collectorAmountBtc),
+      demandBtc: parseStepSize(pair.collector.demandBtc),
+      demand: parseStepSize(pair.collector.demand),
+    })))
 
     if (this.finalPairs.length > 0) {
       generateTable('Final Pairs', this.finalPairs.map(pair => ({
@@ -405,7 +405,7 @@ class TradeBot {
       // console.log('Order Result:')
       // console.table(this.orderResult)
 
-      const newDollarBalance: { [symbol: string]: number } = {}
+      const newDollarBalance: { [symbol: string]: number } = { ...this.normalizedSymbols }
 
       await Binance.getAccountBalances(this.user.id).then(balances => {
         balances.forEach(balance => {
