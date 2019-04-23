@@ -406,13 +406,15 @@ class TradeBot {
       // console.table(this.orderResult)
 
       const newDollarBalance: { [symbol: string]: number } = { ...this.normalizedSymbols }
+      let newBtcTotal: number = 0
 
       await Binance.getAccountBalances(this.user.id).then(balances => {
         balances.forEach(balance => {
           const amount = parseFloat(balance.free)
           if (amount > 0 && this.symbols.includes(balance.asset)) {
             const amountBtc = amount * this.prices[`${balance.asset}BTC`]
-            newDollarBalance[balance.asset] = amountBtc * this.prices['BTCUSDT']
+            newBtcTotal += amountBtc
+            newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
           }
         })
       })
@@ -432,13 +434,21 @@ class TradeBot {
       //   }, {})
       //   return acc
       // }, {}))
-    }
 
-    console.log(
-      `    time: ${Date.now() - start}ms
+      console.log(
+        `    time: ${Date.now() - start}ms
+    BTC ${parseStepSize(this.userTotalBtc)} - USD ${parseStepSize(newBtcTotal * this.prices['BTCUSDT'])}
+${'= '.repeat(30)}`
+      )
+    } else {
+      console.log(
+        `    time: ${Date.now() - start}ms
     BTC ${parseStepSize(this.userTotalBtc)} - USD ${parseStepSize(this.userTotalBtc * this.prices['BTCUSDT'])}
 ${'= '.repeat(30)}`
-    )
+      )
+    }
+
+
   }
 
 }
