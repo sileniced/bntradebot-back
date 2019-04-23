@@ -15,8 +15,8 @@ import binance, {
 } from 'binance-api-node'
 import User from '../entities/User'
 import SavedOrder from '../entities/SavedOrder'
-import TradeBot from './TradeBot'
-import CreateStockData from './CreateStockData'
+import TradeBot from './TradeBot/TradeBot'
+import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
 
 interface RealOrderResult {
@@ -126,7 +126,7 @@ class BinanceApi {
     interval,
     limit: 200
   })
-  .then(candles => CreateStockData(candles))
+  .then(candles => CreateTechAnalysisData(candles))
   .catch(error => {
     console.error(error)
     return error

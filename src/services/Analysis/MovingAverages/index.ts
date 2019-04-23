@@ -2,7 +2,7 @@ import StockData from 'technicalindicators/declarations/StockData'
 import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
-import { addNAÏVEWeight, addScores } from '../utils'
+import { addNAÏVEWeight, addScores } from '../../utils'
 
 const movingAveragesList = addNAÏVEWeight([
   ...settings.EMA.periods.map(period => [`EMA${period}`]),

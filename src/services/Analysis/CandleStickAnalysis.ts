@@ -1,6 +1,6 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
-import { addEVENWeight } from './utils'
+import { addEVENWeight } from '../utils'
 
 const bullishArr = addEVENWeight([
   ['BullishEngulfingPattern', 2],

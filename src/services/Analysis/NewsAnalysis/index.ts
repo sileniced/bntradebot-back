@@ -1,7 +1,7 @@
 import * as request from 'superagent'
-import { CryptoPanicLink } from '../constants'
+import { CryptoPanicLink } from '../../../constants'
 import { Response } from 'superagent'
-import Scoring, { PostAnalysisResult } from './NewsAnalysis/Scoring'
+import Scoring, { PostAnalysisResult } from './Scoring'
 
 interface AnalysisNewsInput {
   symbols: string[]

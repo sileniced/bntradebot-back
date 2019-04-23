@@ -1,10 +1,10 @@
-import User from '../entities/User'
-import { Binance } from '../index'
+import User from '../../entities/User'
+import { Binance } from '../../index'
 import { NewOrder, OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { Collector, ParticipatingPair, Provider } from './NegotiationTable'
-import SavedOrder from '../entities/SavedOrder'
-import Analysis from './Analysis'
-import { TestOrderResult } from './Binance'
+import SavedOrder from '../../entities/SavedOrder'
+import Analysis from '../Analysis'
+import { TestOrderResult } from '../Binance'
 
 interface CandidatePair {
   pair: string,
@@ -39,17 +39,16 @@ function parseStepSize(qty: any, stepSize: number = 0.00000001) {
 }
 
 const generateTable = (name: string, object) => {
-  // console.log(object)
   const denormalized = Object.entries(object)
   if (denormalized.length === 0) return
 
   console.log(Object.keys(denormalized[0][1]).reduce((acc, key, idx) => {
-    return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + key
+    return acc + ' '.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + key
   }, name))
 
   denormalized.forEach(([title, row]: [any, any]) => {
     console.log(Object.values(row).reduce((acc, value, idx) => {
-      return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + parseStepSize(value)
+      return acc + ' '.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + parseStepSize(value)
     }, title))
   })
   console.log('')
@@ -107,22 +106,6 @@ class TradeBot {
 
     this.symbols.forEach(symbol => {
       this.userBalancePercentage[symbol] = 0
-    })
-  }
-
-  public dropPair = (pair: CandidatePair | ParticipatingPair, reason: string, pairScore?: number): boolean => {
-    this.DroppedPairs[pair.pair] = {
-      ...pair,
-      reason
-    }
-    if (pairScore) this.DroppedPairs[pair.pair].pairScore = pairScore
-    return false
-  }
-
-  public addToFinalPairs = (order: NewOrder, btcValue: number) => {
-    this.finalPairs.push({
-      order,
-      feeDollars: btcValue * 0.0075 * this.prices['BTCUSDT']
     })
   }
 
@@ -288,26 +271,35 @@ class TradeBot {
       }
     })
 
+    const dropPair = (pair: CandidatePair | ParticipatingPair, reason: string, pairScore?: number): boolean => {
+      this.DroppedPairs[pair.pair] = {
+        ...pair,
+        reason
+      }
+      if (pairScore) this.DroppedPairs[pair.pair].pairScore = pairScore
+      return false
+    }
+
     this.candidatePairs = this.candidatePairs.filter(candidatePair => {
       if (candidatePair.side === 'BUY') {
         if (candidatePair.collector.demand < candidatePair.minBase) {
-          return this.dropPair(candidatePair, 'collector<minBase')
+          return dropPair(candidatePair, 'collector<minBase')
         }
         if (candidatePair.provider.spendable < candidatePair.minQuote) {
-          return this.dropPair(candidatePair, 'provider<minQuote')
+          return dropPair(candidatePair, 'provider<minQuote')
         }
         if (this.analysis.pairAnalysis[candidatePair.pair].base.score === 0) {
-          return this.dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
+          return dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       } else {
         if (candidatePair.provider.spendable < candidatePair.minBase) {
-          return this.dropPair(candidatePair, 'provider<minBase')
+          return dropPair(candidatePair, 'provider<minBase')
         }
         if (candidatePair.collector.demand < candidatePair.minQuote) {
-          return this.dropPair(candidatePair, 'collector<minQuote')
+          return dropPair(candidatePair, 'collector<minQuote')
         }
         if (this.analysis.pairAnalysis[candidatePair.pair].quote.score === 0) {
-          return this.dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
+          return dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       }
       return true
@@ -336,12 +328,19 @@ class TradeBot {
     // console.log('Participating Pairs:')
     // console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
 
+    const addToFinalPairs = (order: NewOrder, btcValue: number) => {
+      this.finalPairs.push({
+        order,
+        feeDollars: btcValue * 0.0075 * this.prices['BTCUSDT']
+      })
+    }
+
     this.negotiationTable = new NegotiationTable({
       participatingPairs: this.participatingPairs,
       providers: Object.values(this.providers),
       collectors: Object.values(this.collectors),
-      dropPair: this.dropPair,
-      addToFinalPairs: this.addToFinalPairs
+      dropPair: dropPair,
+      addToFinalPairs: addToFinalPairs
     })
 
     await this.negotiationTable.run()
@@ -406,6 +405,8 @@ class TradeBot {
           this.orderResult.push(result)
         })
       }))
+
+
       // await Promise.all(this.finalPairs.map((order, idx) => {
       //   return new Promise(resolve => setTimeout(() => {
       //     resolve(Binance.newOrderTest(this.user, order.feeDollars, order.order))

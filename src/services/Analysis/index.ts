@@ -1,11 +1,11 @@
 import { CandleChartInterval, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
-import { Binance } from '../index'
+import { Binance } from '../../index'
 import Oscillators from './Oscillators'
 import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
-import AnalysisNews from './AnalysisNews'
+import AnalysisNews from './NewsAnalysis'
 
 export interface PairScore {
   _pairScore: number,
