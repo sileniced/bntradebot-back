@@ -122,7 +122,7 @@ class TradeBot {
   public addToFinalPairs = (order: NewOrder, btcValue: number) => {
     this.finalPairs.push({
       order,
-      feeDollars: btcValue * 0.075 * this.prices['BTCUSDT']
+      feeDollars: btcValue * 0.0075 * this.prices['BTCUSDT']
     })
   }
 
