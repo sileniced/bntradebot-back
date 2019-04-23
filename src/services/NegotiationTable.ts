@@ -96,8 +96,8 @@ class NegotiationTable {
                   this.providerFunds[pair.provider.providerSymbol] -= pair.quoteAmount
                   this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
                   this.collectorAmount[pair.collector.collectorSymbol] = 0
-                } else this.dropPair(pair, 'provider quote.amount < minQuote')
-              } else this.dropPair(pair, 'collector base.amount < minBase')
+                } else this.dropPair(pair, 'prov quote<minQuote')
+              } else this.dropPair(pair, 'coll base<minBase')
             } else {
               pair.quoteAmount = this.collectorAmount[pair.collector.collectorSymbol] // collector
               pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize) // provider
@@ -113,8 +113,8 @@ class NegotiationTable {
                   this.providerFunds[pair.provider.providerSymbol] -= pair.baseAmount
                   this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
                   this.collectorAmount[pair.collector.collectorSymbol] = 0
-                } else this.dropPair(pair, 'collector quote.amount < minQuote')
-              } else this.dropPair(pair, 'provider base.amount < minBase')
+                } else this.dropPair(pair, 'coll quote<minQuote')
+              } else this.dropPair(pair, 'prov base<minBase')
             }
           } else if (pair.providerFundsBtc < pair.collectorAmountBtc) {
             if (pair.side === 'BUY') {
@@ -132,8 +132,8 @@ class NegotiationTable {
                   this.collectorAmount[pair.collector.collectorSymbol] -= pair.quoteAmount
                   this.providerFundsBtc[pair.provider.providerSymbol] = 0
                   this.providerFunds[pair.provider.providerSymbol] = 0
-                } else this.dropPair(pair, 'provider quote.amount < minQuote')
-              } else this.dropPair(pair, 'collector base.amount < minBase')
+                } else this.dropPair(pair, 'prov quote<minQuote')
+              } else this.dropPair(pair, 'coll base<minBase')
             } else {
               pair.baseAmount = parseStepSize(this.providerFunds[pair.provider.providerSymbol], pair.stepSize) // provider
               pair.quoteAmount = pair.baseAmount * pair.price // collector
@@ -149,12 +149,12 @@ class NegotiationTable {
                   this.collectorAmount[pair.collector.collectorSymbol] -= pair.baseAmount
                   this.providerFundsBtc[pair.provider.providerSymbol] = 0
                   this.providerFunds[pair.provider.providerSymbol] = 0
-                } else this.dropPair(pair, 'collector quote.amount < minQuote')
-              } else this.dropPair(pair, 'provider base.amount < minBase')
+                } else this.dropPair(pair, 'coll quote<minQuote')
+              } else this.dropPair(pair, 'prov base<minBase')
             }
           }
-        } else this.dropPair(pair, 'collector amount satisfied')
-      } else this.dropPair(pair, 'providerFunds dry')
+        } else this.dropPair(pair, 'collector satisfied')
+      } else this.dropPair(pair, 'provider dry')
     }, [] as NewOrder[])
   }
 

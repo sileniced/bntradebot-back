@@ -38,9 +38,26 @@ interface DroppedPair {
   quoteAmount?: number
 }
 
-function parseStepSize(qty: any, stepSize: number = 0.00000001 ) {
+function parseStepSize(qty: any, stepSize: number = 0.00000001) {
   if (typeof qty !== 'number') return qty
   return Math.floor(qty / stepSize) / (1 / stepSize)
+}
+
+const generateTable = (name: string, object) => {
+  console.log('')
+  console.log('')
+  // console.log(object)
+  const denormalized = Object.entries(object)
+  if (denormalized.length === 0) return
+  console.log(Object.keys(denormalized[0][1]).reduce((acc, key, idx) => {
+    return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + key
+  }, name))
+  denormalized.forEach(([title, rows]: [any, any]) => {
+    console.log(Object.values(rows).reduce((acc, value, idx) => {
+      return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + parseStepSize(value)
+    }, title))
+  })
+  console.log('')
 }
 
 class TradeBot {
@@ -163,14 +180,16 @@ ${'= '.repeat(30)}
 
     await analysisPromise
 
-    console.log('Market Analysis')
-    console.table(Object.entries(this.analysis.marketAnalysis).reduce((acc, [title, pie]) => {
-      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-        acc[symbol] = parseStepSize(amount)
-        return acc
-      }, {})
-      return acc
-    }, {}))
+    generateTable('Market Analysis', this.analysis.marketAnalysis)
+    // console.log('Market Analysis')
+    // console.table(Object.entries(this.analysis.marketAnalysis).reduce((acc, [title, pie]) => {
+    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+    //     acc[symbol] = parseStepSize(amount)
+    //     return acc
+    //   }, {})
+    //   return acc
+    // }, {}))
+
 
     this.symbols.forEach(symbol => {
       this.differencePercentage[symbol] = this.userBalancePercentage[symbol] - this.analysis.symbolPie[symbol]
@@ -198,39 +217,49 @@ ${'= '.repeat(30)}
       }
     })
 
-    console.log('SymbolPie:')
-    console.table(Object.entries({
+    generateTable('SymbolPie', {
       ['% balance']: this.userBalancePercentage,
       ['% symbol pie']: this.analysis.symbolPie,
       ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
       ['$ difference']: dollarDifference
-    }).reduce((acc, [title, pie]) => {
-      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-        acc[symbol] = parseStepSize(amount)
-        return acc
-      }, {})
-      return acc
-    }, {}))
+    })
+    // console.log('SymbolPie:')
+    // console.table(Object.entries({
+    //   ['% balance']: this.userBalancePercentage,
+    //   ['% symbol pie']: this.analysis.symbolPie,
+    //   ['% difference']: this.differencePercentage,
+    //   ['$ balance']: dollarBalance,
+    //   ['$ symbol pie']: dollarSymbolPie,
+    //   ['$ difference']: dollarDifference
+    // }).reduce((acc, [title, pie]) => {
+    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+    //     acc[symbol] = parseStepSize(amount)
+    //     return acc
+    //   }, {})
+    //   return acc
+    // }, {}))
 
-    console.log('Providers:')
-    console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
-      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-        return acc
-      }, {})
-      return acc
-    }, {}))
+    generateTable('Providers', this.providers)
+    // console.log('Providers:')
+    // console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
+    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+    //     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+    //     return acc
+    //   }, {})
+    //   return acc
+    // }, {}))
 
-    console.log('Collectors:')
-    console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
-      acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-        acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-        return acc
-      }, {})
-      return acc
-    }, {}))
+    generateTable('Collectors', this.collectors)
+    // console.log('Collectors:')
+    // console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
+    //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+    //     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
+    //     return acc
+    //   }, {})
+    //   return acc
+    // }, {}))
 
     this.pairsInfo.forEach(pairInfo => {
       if (
@@ -256,23 +285,23 @@ ${'= '.repeat(30)}
     this.candidatePairs = this.candidatePairs.filter(candidatePair => {
       if (candidatePair.side === 'BUY') {
         if (candidatePair.collector.demand < candidatePair.minBase) {
-          return this.dropPair(candidatePair, 'collector.demand < minBase')
+          return this.dropPair(candidatePair, 'collector<minBase')
         }
         if (candidatePair.provider.spendable < candidatePair.minQuote) {
-          return this.dropPair(candidatePair, 'provider.spendable < minQuote')
+          return this.dropPair(candidatePair, 'provider<minQuote')
         }
         if (this.analysis.pairAnalysis[candidatePair.pair].base.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
+          return this.dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       } else {
         if (candidatePair.provider.spendable < candidatePair.minBase) {
-          return this.dropPair(candidatePair, 'provider.spendable < minBase')
+          return this.dropPair(candidatePair, 'provider<minBase')
         }
         if (candidatePair.collector.demand < candidatePair.minQuote) {
-          return this.dropPair(candidatePair, 'collector.demand < minQuote')
+          return this.dropPair(candidatePair, 'collector<minQuote')
         }
         if (this.analysis.pairAnalysis[candidatePair.pair].quote.score === 0) {
-          return this.dropPair(candidatePair, 'collector.score === 0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
+          return this.dropPair(candidatePair, 'score=0', this.analysis.pairAnalysis[candidatePair.pair]._pairScore)
         }
       }
       return true
@@ -292,8 +321,16 @@ ${'= '.repeat(30)}
       price: this.prices[candidatePair.pair]
     })).sort((a, b) => b.collectorScore - a.collectorScore)
 
-    console.log('Participating Pairs:')
-    console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
+    // console.log(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
+    //   acc[pair.pair] = pair
+    //   return acc
+    // }, {}))
+    generateTable('Participating Pairs', this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
+      acc[pair.pair] = pair
+      return acc
+    }, {}))
+    // console.log('Participating Pairs:')
+    // console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
 
     this.negotiationTable = new NegotiationTable({
       participatingPairs: this.participatingPairs,
@@ -305,8 +342,7 @@ ${'= '.repeat(30)}
 
     await this.negotiationTable.run()
 
-    console.log('Dropped Pairs:')
-    console.table(Object.values(this.DroppedPairs).map((pair): any => ({
+    generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
       pair: pair.pair,
       side: pair.side,
       reason: pair.reason,
@@ -321,17 +357,46 @@ ${'= '.repeat(30)}
       collector: pair.collector.collectorSymbol,
       amountBtc: parseStepSize(pair.collectorAmountBtc),
       demandBtc: parseStepSize(pair.collector.demandBtc),
-      demand: parseStepSize(pair.collector.demand),
-    })))
+      demand: parseStepSize(pair.collector.demand)
+    })).reduce((acc, pair) => {
+      acc[pair.pair] = pair
+      return acc
+    }, {}))
+    // console.log('Dropped Pairs:')
+    // console.table(Object.values(this.DroppedPairs).map((pair): any => ({
+    //   pair: pair.pair,
+    //   side: pair.side,
+    //   reason: pair.reason,
+    //   minBase: pair.minBase,
+    //   baseAmount: parseStepSize(pair.baseAmount),
+    //   minQuote: pair.minQuote,
+    //   quoteAmount: parseStepSize(pair.quoteAmount),
+    //   provider: pair.provider.providerSymbol,
+    //   fundsBtc: parseStepSize(pair.providerFundsBtc),
+    //   spendableBtc: parseStepSize(pair.provider.spendableBtc),
+    //   spendable: parseStepSize(pair.provider.spendable),
+    //   collector: pair.collector.collectorSymbol,
+    //   amountBtc: parseStepSize(pair.collectorAmountBtc),
+    //   demandBtc: parseStepSize(pair.collector.demandBtc),
+    //   demand: parseStepSize(pair.collector.demand),
+    // })))
 
     if (this.finalPairs.length > 0) {
-      console.log('Final Pairs:')
-      console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars)})))
+      generateTable('Final Pairs', this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars) })).reduce((acc, pair) => {
+        acc[pair.symbol] = pair
+        return acc
+      }, {}))
+      // console.log('Final Pairs:')
+      // console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars)})))
 
       this.orderResult = await Promise.all(this.finalPairs.map(order => Binance.newOrder(this.user, order.feeDollars, order.order)))
 
-      console.log('Order Result:')
-      console.table(this.orderResult)
+      generateTable('Order Result', this.orderResult.reduce((acc, pair) => {
+        acc[pair.pair] = pair
+        return acc
+      }, {}))
+      // console.log('Order Result:')
+      // console.table(this.orderResult)
 
       const newDollarBalance: { [symbol: string]: number } = {}
 
@@ -345,17 +410,21 @@ ${'= '.repeat(30)}
         })
       })
 
-      console.log('New Dollar Balance: ')
-      console.table(Object.entries({
+      generateTable('New Dollar Balance', {
         ['$ old balance']: dollarBalance,
         ['$ new balance']: newDollarBalance
-      }).reduce((acc, [title, pie]) => {
-        acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-          acc[symbol] = parseStepSize(amount)
-          return acc
-        }, {})
-        return acc
-      }, {}))
+      })
+      // console.log('New Dollar Balance: ')
+      // console.table(Object.entries({
+      //   ['$ old balance']: dollarBalance,
+      //   ['$ new balance']: newDollarBalance
+      // }).reduce((acc, [title, pie]) => {
+      //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
+      //     acc[symbol] = parseStepSize(amount)
+      //     return acc
+      //   }, {})
+      //   return acc
+      // }, {}))
     }
 
     console.log(`time: ${Date.now() - start}ms`)
