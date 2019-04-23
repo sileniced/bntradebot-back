@@ -366,24 +366,24 @@ class TradeBot {
       acc[pair.pair] = pair
       return acc
     }, {}))
-    console.log('Dropped Pairs:')
-    console.table(Object.values(this.DroppedPairs).map((pair): any => ({
-      pair: pair.pair,
-      side: pair.side,
-      reason: pair.reason,
-      minBase: pair.minBase,
-      baseAmount: parseStepSize(pair.baseAmount),
-      minQuote: pair.minQuote,
-      quoteAmount: parseStepSize(pair.quoteAmount),
-      provider: pair.provider.providerSymbol,
-      fundsBtc: parseStepSize(pair.providerFundsBtc),
-      spendableBtc: parseStepSize(pair.provider.spendableBtc),
-      spendable: parseStepSize(pair.provider.spendable),
-      collector: pair.collector.collectorSymbol,
-      amountBtc: parseStepSize(pair.collectorAmountBtc),
-      demandBtc: parseStepSize(pair.collector.demandBtc),
-      demand: parseStepSize(pair.collector.demand),
-    })))
+    // console.log('Dropped Pairs:')
+    // console.table(Object.values(this.DroppedPairs).map((pair): any => ({
+    //   pair: pair.pair,
+    //   side: pair.side,
+    //   reason: pair.reason,
+    //   minBase: pair.minBase,
+    //   baseAmount: parseStepSize(pair.baseAmount),
+    //   minQuote: pair.minQuote,
+    //   quoteAmount: parseStepSize(pair.quoteAmount),
+    //   provider: pair.provider.providerSymbol,
+    //   fundsBtc: parseStepSize(pair.providerFundsBtc),
+    //   spendableBtc: parseStepSize(pair.provider.spendableBtc),
+    //   spendable: parseStepSize(pair.provider.spendable),
+    //   collector: pair.collector.collectorSymbol,
+    //   amountBtc: parseStepSize(pair.collectorAmountBtc),
+    //   demandBtc: parseStepSize(pair.collector.demandBtc),
+    //   demand: parseStepSize(pair.collector.demand),
+    // })))
 
     if (this.finalPairs.length > 0) {
       generateTable('Final Pairs', this.finalPairs.map(pair => ({
