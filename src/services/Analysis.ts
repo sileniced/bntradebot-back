@@ -21,6 +21,7 @@ export interface PairScore {
 
 export interface AnalysisInput {
   pairsInfo: Symbol[]
+  normalizedSymbols: { [symbol: string]: number }
 }
 
 export interface MarketAnalysisResult {
@@ -67,7 +68,7 @@ class Analysis implements IAnalysis {
   private symbolTotals: { [pair: string]: number } = {}
   private allTotals: number = 0
 
-  constructor({ pairsInfo }: AnalysisInput) {
+  constructor({ pairsInfo, normalizedSymbols }: AnalysisInput) {
 
     this.pairsInfo = pairsInfo
     this.pairs = pairsInfo.map(pair => pair.symbol)
@@ -78,14 +79,9 @@ class Analysis implements IAnalysis {
       return acc
     }, {}))
 
-    const normalizedSymbols = this.symbols.reduce((acc, s) => {
-      acc[s] = 0
-      return acc
-    }, {})
-
-    this.techSymbolAnalysis = normalizedSymbols
-    this.symbolPie = normalizedSymbols
-    this.symbolTotals = normalizedSymbols
+    this.techSymbolAnalysis = { ...normalizedSymbols }
+    this.symbolPie = { ...normalizedSymbols }
+    this.symbolTotals = { ...normalizedSymbols }
 
     this.marketAnalysis['ALTS'] = {
       score: 0,
@@ -97,7 +93,7 @@ class Analysis implements IAnalysis {
     .reduce((acc, quoteSymbol) => {
       acc[quoteSymbol]++
       return acc
-    }, normalizedSymbols))
+    }, { ...normalizedSymbols }))
 
     quoteSymbols.forEach(([quoteSymbol, count]) => {
       if (count > pairsInfo.length / quoteSymbols.length) this.quoteSymbols.push(quoteSymbol)
@@ -209,7 +205,7 @@ class Analysis implements IAnalysis {
 
     /** this.symbolPie = */
     this.symbols.forEach(symbol => {
-      this.symbolPie[symbol] = this.symbolTotals[symbol] / this.allTotals
+      this.symbolPie[symbol] += this.symbolTotals[symbol] / this.allTotals
     })
 
     console.log(`analysis time: ${Date.now() - start}ms`)

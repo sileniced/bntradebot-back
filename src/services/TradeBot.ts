@@ -5,12 +5,6 @@ import NegotiationTable, { Collector, ParticipatingPair, Provider } from './Nego
 import SavedOrder from '../entities/SavedOrder'
 import Analysis from './Analysis'
 
-interface UserBalance {
-  symbol: string,
-  amount: number,
-  amountBtc: number
-}
-
 interface CandidatePair {
   pair: string,
   side: OrderSide,
@@ -47,11 +41,13 @@ const generateTable = (name: string, object) => {
   // console.log(object)
   const denormalized = Object.entries(object)
   if (denormalized.length === 0) return
+
   console.log(Object.keys(denormalized[0][1]).reduce((acc, key, idx) => {
     return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + key
   }, name))
-  denormalized.forEach(([title, rows]: [any, any]) => {
-    console.log(Object.values(rows).reduce((acc, value, idx) => {
+
+  denormalized.forEach(([title, row]: [any, any]) => {
+    console.log(Object.values(row).reduce((acc, value, idx) => {
       return acc + ` `.repeat(((idx + 1) * 20) - acc.length > 0 ? ((idx + 1) * 20) - acc.length : 0) + parseStepSize(value)
     }, title))
   })
@@ -60,30 +56,31 @@ const generateTable = (name: string, object) => {
 
 class TradeBot {
 
+
   // todo: get from user database ('USDT' required)
   readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO']
-  // readonly symbols = ['USDT', 'BTC']
+  protected readonly normalizedSymbols: { [symbol: string]: number }
   protected pairsInfo: Symbol[] = []
 
   protected readonly user: User
-  private userTotalBtc: number = 0
-
-  private userBalance: { [symbol: string]: UserBalance } = {}
-  private userBalancePercentage: { [symbol: string]: number } = {}
 
   private prices: { [pair: string]: number } = { ['BTCBTC']: 1 }
+
+  private userTotalBtc: number = 0
+  private userBalance: { [symbol: string]: number } = {}
+  private userBalanceBtc: { [symbol: string]: number } = {}
+  private userBalancePercentage: { [symbol: string]: number } = {}
 
   private analysis: Analysis
 
   private differencePercentage: { [symbol: string]: number } = {}
   private differenceBtc: { [symbol: string]: number } = {}
-
   private difference: { [symbol: string]: number } = {}
+
   private providers: { [symbol: string]: Provider } = {}
-
   private collectors: { [symbol: string]: Collector } = {}
-  private candidatePairs: CandidatePair[] = []
 
+  private candidatePairs: CandidatePair[] = []
   private DroppedPairs: { [pair: string]: DroppedPair } = {}
 
   private participatingPairs: ParticipatingPair[] = []
@@ -93,7 +90,21 @@ class TradeBot {
   private orderResult: SavedOrder[] = []
 
   constructor(user: User) {
+
     this.user = user
+
+    this.normalizedSymbols = this.symbols.reduce((acc, s) => {
+      acc[s] = 0
+      return acc
+    }, {})
+
+    this.userBalance = { ...this.normalizedSymbols }
+    this.userBalanceBtc = { ...this.normalizedSymbols }
+    this.userBalancePercentage = { ...this.normalizedSymbols }
+    this.differencePercentage = { ...this.normalizedSymbols }
+    this.differenceBtc = { ...this.normalizedSymbols }
+    this.difference = { ...this.normalizedSymbols }
+
     this.symbols.forEach(symbol => {
       this.userBalancePercentage[symbol] = 0
     })
@@ -122,33 +133,36 @@ class TradeBot {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
     })
 
-    this.analysis = new Analysis({ pairsInfo: this.pairsInfo })
+    this.analysis = new Analysis({ pairsInfo: this.pairsInfo, normalizedSymbols: this.normalizedSymbols })
     const analysisPromise = this.analysis.run()
 
     // this.symbolAnalysis = SymbolAnalysis(this.symbols, this.pairsInfo)
 
     this.prices['BTCUSDT'] = await Binance.getAvgPrice('BTCUSDT')
     this.prices['USDTBTC'] = 1 / this.prices['BTCUSDT']
-    this.prices['PAXBTC'] = 1 / this.prices['BTCUSDT']
 
-    const avgPricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT', 'PAX'].includes(symbol)).map(symbol => `${symbol}BTC`)
-    const avgPricesBtcUnnamed = await Promise.all(avgPricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
-    avgPricesBtcNames.forEach((pair, idx) => {
-      this.prices[pair] = avgPricesBtcUnnamed[idx]
+    const avgPricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
+    await Promise.all(avgPricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
+    .then(avgPricesBtc => {
+      avgPricesBtcNames.forEach((pair, idx) => {
+        this.prices[pair] = avgPricesBtc[idx]
+      })
     })
 
     const userBalanceSymbols: string[] = []
-    const dollarBalance: { [symbol: string]: number } = {}
+    const dollarBalance: { [symbol: string]: number } = { ...this.normalizedSymbols }
 
-    await Binance.getAccountBalances(this.user.id).then(balances => {
+    await Binance.getAccountBalances(this.user.id)
+    .then(balances => {
       balances.forEach(balance => {
         const amount = parseFloat(balance.free)
         if (amount > 0 && this.symbols.includes(balance.asset)) {
           userBalanceSymbols.push(balance.asset)
           const amountBtc = amount * this.prices[`${balance.asset}BTC`]
-          dollarBalance[balance.asset] = amountBtc * this.prices['BTCUSDT']
+          dollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
           this.userTotalBtc += amountBtc
-          this.userBalance[balance.asset] = { symbol: balance.asset, amount, amountBtc }
+          this.userBalance[balance.asset] += amount
+          this.userBalanceBtc[balance.asset] += amountBtc
         }
       })
     })
@@ -161,14 +175,14 @@ class TradeBot {
     )
 
     userBalanceSymbols.forEach(symbol => {
-      this.userBalancePercentage[symbol] = this.userBalance[symbol].amountBtc / this.userTotalBtc
+      this.userBalancePercentage[symbol] += this.userBalanceBtc[symbol] / this.userTotalBtc
     })
 
     const providerSymbols: string[] = []
     const collectorSymbols: string[] = []
 
-    const dollarSymbolPie: { [symbol: string]: number } = {}
-    const dollarDifference: { [symbol: string]: number } = {}
+    const dollarSymbolPie: { [symbol: string]: number } = { ...this.normalizedSymbols }
+    const dollarDifference: { [symbol: string]: number } = { ...this.normalizedSymbols }
 
     await analysisPromise
 
@@ -184,22 +198,22 @@ class TradeBot {
 
 
     this.symbols.forEach(symbol => {
-      this.differencePercentage[symbol] = this.userBalancePercentage[symbol] - this.analysis.symbolPie[symbol]
-      this.differenceBtc[symbol] = this.differencePercentage[symbol] * this.userTotalBtc
-      this.difference[symbol] = this.differenceBtc[symbol] / this.prices[`${symbol}BTC`]
-      dollarSymbolPie[symbol] = this.analysis.symbolPie[symbol] * this.userTotalBtc * this.prices['BTCUSDT']
-      dollarDifference[symbol] = this.differenceBtc[symbol] * this.prices['BTCUSDT']
+      this.differencePercentage[symbol] += this.analysis.symbolPie[symbol] - this.userBalancePercentage[symbol]
+      this.differenceBtc[symbol] += this.differencePercentage[symbol] * this.userTotalBtc
+      this.difference[symbol] += this.differenceBtc[symbol] / this.prices[`${symbol}BTC`]
+      dollarSymbolPie[symbol] += this.analysis.symbolPie[symbol] * this.userTotalBtc * this.prices['BTCUSDT']
+      dollarDifference[symbol] += this.differenceBtc[symbol] * this.prices['BTCUSDT']
 
-      if (this.differencePercentage[symbol] > 0) {
+      if (this.differencePercentage[symbol] < 0) {
         providerSymbols.push(symbol)
         this.providers[symbol] = {
           providerSymbol: symbol,
           spendableBtc: this.differenceBtc[symbol],
           spendable: this.difference[symbol],
-          totalSpendableBtc: this.userBalance[symbol].amountBtc,
-          totalSpendable: this.userBalance[symbol].amount
+          totalSpendableBtc: this.userBalanceBtc[symbol],
+          totalSpendable: this.userBalance[symbol]
         }
-      } else if (this.differencePercentage[symbol] < 0) {
+      } else if (this.differencePercentage[symbol] > 0) {
         collectorSymbols.push(symbol)
         this.collectors[symbol] = {
           collectorSymbol: symbol,
@@ -210,9 +224,9 @@ class TradeBot {
     })
 
     generateTable('SymbolPie', {
-      // ['% balance']: this.userBalancePercentage,
-      // ['% symbol pie']: this.analysis.symbolPie,
-      // ['% difference']: this.differencePercentage,
+      ['% balance']: this.userBalancePercentage,
+      ['% symbol pie']: this.analysis.symbolPie,
+      ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
       ['$ difference']: dollarDifference
@@ -300,9 +314,11 @@ class TradeBot {
     })
 
     const pricesParticipatingPairsNames = this.candidatePairs.map(pair => pair.pair)
-    const pricesParticipatingPairsUnnamed = await Promise.all(pricesParticipatingPairsNames.map(pair => Binance.getAvgPrice(pair)))
-    pricesParticipatingPairsNames.forEach((pair, idx) => {
-      this.prices[pair] = pricesParticipatingPairsUnnamed[idx]
+    await Promise.all(pricesParticipatingPairsNames.map(pair => Binance.getAvgPrice(pair)))
+    .then(pricesParticipatingPairs => {
+      pricesParticipatingPairsNames.forEach((pair, idx) => {
+        this.prices[pair] = pricesParticipatingPairs[idx]
+      })
     })
 
     this.participatingPairs = this.candidatePairs.map(candidatePair => ({
