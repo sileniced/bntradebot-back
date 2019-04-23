@@ -5,7 +5,6 @@ import binance, {
   CandleChartResult,
   ExchangeInfo,
   NewOrder,
-  Order,
   OrderBook,
   OrderFill,
   OrderSide,
@@ -20,7 +19,7 @@ import TradeBot from './TradeBot'
 import CreateStockData from './CreateStockData'
 import StockData from 'technicalindicators/declarations/StockData'
 
-interface realOrder {
+interface RealOrderResult {
   clientOrderId: string;
   executedQty: string;
   cummulativeQuoteQty: string;
@@ -38,6 +37,10 @@ interface realOrder {
   fills?: OrderFill[];
 }
 
+export interface TestOrderResult {
+  feeDollars: number,
+  pair: string,
+}
 
 class BinanceApi {
 
@@ -140,30 +143,37 @@ class BinanceApi {
   .then(result => result.balances)
 
 
-  public newOrder = (user: User, feeDollars: number, order: NewOrder): Promise<SavedOrder> => this.authenticatedApi[user.id].order(order)
-  .then((result: realOrder) => SavedOrder.create({
-      user,
-      clientOrderId: result.clientOrderId,
-      orderId: result.orderId,
-      pair: result.symbol,
-      side: result.side,
-      transactTime: result.transactTime,
-      executedQty: parseFloat(result.executedQty),
-      cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty),
-      feeDollars
+  public newOrder = (user: User, feeDollars: number, order: NewOrder): Promise<SavedOrder> =>
+    this.authenticatedApi[user.id].order(order)
+    .then((result: RealOrderResult) => SavedOrder.create({
+        user,
+        clientOrderId: result.clientOrderId,
+        orderId: result.orderId,
+        pair: result.symbol,
+        side: result.side,
+        transactTime: result.transactTime,
+        executedQty: parseFloat(result.executedQty),
+        cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty),
+        feeDollars
+      })
+      .save()
+    )
+    .catch(error => {
+      console.error(error)
+      return error
     })
-    .save()
-  )
-  .catch(error => {
-    console.error(error)
-    return error
-  })
 
-  public newOrderTest = (userId: number, order: NewOrder): Promise<Order> => this.authenticatedApi[userId].orderTest(order)
-  .catch(error => {
-    console.error(error)
-    return error
-  })
+  public newOrderTest = (user: User, feeDollars: number, order: NewOrder): Promise<TestOrderResult> =>
+    this.authenticatedApi[user.id].orderTest(order)
+    .then((result: any) => {
+      result.pair = order.symbol
+      result.feeDollars = feeDollars
+      return result
+    })
+    .catch(error => {
+      console.error(error)
+      return error
+    })
 }
 
 export default BinanceApi
