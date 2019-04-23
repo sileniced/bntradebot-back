@@ -39,12 +39,17 @@ class AnalysisNews implements IAnalysisNews {
 
   private readonly symbols: string[] = []
 
+  private errorShown = false
+
   private readonly pages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   private readonly cryptoPanicApi = (symbols: string[], page: number): Promise<CryptoPanicPost[]> => request.get(CryptoPanicLink(symbols, page))
   .timeout({ deadline: 2000 })
   .then((response: Response): CryptoPanicPost[] => response.body.results)
   .catch(error => {
-    console.error(`CryptoPanic offline: ${error.toString()}`)
+    if (!this.errorShown) {
+      this.errorShown = true
+      console.error(`CryptoPanic offline: ${error.toString()}`)
+    }
     return [] as CryptoPanicPost[]
   })
 

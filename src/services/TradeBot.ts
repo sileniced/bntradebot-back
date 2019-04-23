@@ -44,8 +44,6 @@ function parseStepSize(qty: any, stepSize: number = 0.00000001) {
 }
 
 const generateTable = (name: string, object) => {
-  console.log('')
-  console.log('')
   // console.log(object)
   const denormalized = Object.entries(object)
   if (denormalized.length === 0) return
@@ -156,15 +154,9 @@ class TradeBot {
     })
 
     console.log(
-      `
-${'= '.repeat(30)}
-    
+      `${'= '.repeat(30)}
     time: ${new Date()}
-    binance calls ${this.analysis.apiCalls}
-    
-    balance BTC ${parseStepSize(this.userTotalBtc)}
-    balance USD ${parseStepSize(this.userTotalBtc * this.prices['BTCUSDT'])}
-    
+    BTC ${parseStepSize(this.userTotalBtc)} - USD ${parseStepSize(this.userTotalBtc * this.prices['BTCUSDT'])}
 `
     )
 
@@ -218,9 +210,9 @@ ${'= '.repeat(30)}
     })
 
     generateTable('SymbolPie', {
-      ['% balance']: this.userBalancePercentage,
-      ['% symbol pie']: this.analysis.symbolPie,
-      ['% difference']: this.differencePercentage,
+      // ['% balance']: this.userBalancePercentage,
+      // ['% symbol pie']: this.analysis.symbolPie,
+      // ['% difference']: this.differencePercentage,
       ['$ balance']: dollarBalance,
       ['$ symbol pie']: dollarSymbolPie,
       ['$ difference']: dollarDifference
@@ -241,7 +233,7 @@ ${'= '.repeat(30)}
     //   return acc
     // }, {}))
 
-    generateTable('Providers', this.providers)
+    // generateTable('Providers', this.providers)
     // console.log('Providers:')
     // console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
     //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
@@ -251,7 +243,7 @@ ${'= '.repeat(30)}
     //   return acc
     // }, {}))
 
-    generateTable('Collectors', this.collectors)
+    // generateTable('Collectors', this.collectors)
     // console.log('Collectors:')
     // console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
     //   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
@@ -321,14 +313,10 @@ ${'= '.repeat(30)}
       price: this.prices[candidatePair.pair]
     })).sort((a, b) => b.collectorScore - a.collectorScore)
 
-    // console.log(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
+    // generateTable('Participating Pairs', this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
     //   acc[pair.pair] = pair
     //   return acc
     // }, {}))
-    generateTable('Participating Pairs', this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
-      acc[pair.pair] = pair
-      return acc
-    }, {}))
     // console.log('Participating Pairs:')
     // console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
 
@@ -342,26 +330,26 @@ ${'= '.repeat(30)}
 
     await this.negotiationTable.run()
 
-    generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
-      pair: pair.pair,
-      side: pair.side,
-      reason: pair.reason,
-      minBase: pair.minBase,
-      baseAmount: parseStepSize(pair.baseAmount),
-      minQuote: pair.minQuote,
-      quoteAmount: parseStepSize(pair.quoteAmount),
-      provider: pair.provider.providerSymbol,
-      fundsBtc: parseStepSize(pair.providerFundsBtc),
-      spendableBtc: parseStepSize(pair.provider.spendableBtc),
-      spendable: parseStepSize(pair.provider.spendable),
-      collector: pair.collector.collectorSymbol,
-      amountBtc: parseStepSize(pair.collectorAmountBtc),
-      demandBtc: parseStepSize(pair.collector.demandBtc),
-      demand: parseStepSize(pair.collector.demand)
-    })).reduce((acc, pair) => {
-      acc[pair.pair] = pair
-      return acc
-    }, {}))
+    // generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
+    //   pair: pair.pair,
+    //   side: pair.side,
+    //   reason: pair.reason,
+    //   minBase: pair.minBase,
+    //   baseAmount: parseStepSize(pair.baseAmount),
+    //   minQuote: pair.minQuote,
+    //   quoteAmount: parseStepSize(pair.quoteAmount),
+    //   provider: pair.provider.providerSymbol,
+    //   fundsBtc: parseStepSize(pair.providerFundsBtc),
+    //   spendableBtc: parseStepSize(pair.provider.spendableBtc),
+    //   spendable: parseStepSize(pair.provider.spendable),
+    //   collector: pair.collector.collectorSymbol,
+    //   amountBtc: parseStepSize(pair.collectorAmountBtc),
+    //   demandBtc: parseStepSize(pair.collector.demandBtc),
+    //   demand: parseStepSize(pair.collector.demand)
+    // })).reduce((acc, pair) => {
+    //   acc[pair.pair] = pair
+    //   return acc
+    // }, {}))
     // console.log('Dropped Pairs:')
     // console.table(Object.values(this.DroppedPairs).map((pair): any => ({
     //   pair: pair.pair,
@@ -382,7 +370,10 @@ ${'= '.repeat(30)}
     // })))
 
     if (this.finalPairs.length > 0) {
-      generateTable('Final Pairs', this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars) })).reduce((acc, pair) => {
+      generateTable('Final Pairs', this.finalPairs.map(pair => ({
+        ...pair.order,
+        feeDollars: parseStepSize(pair.feeDollars)
+      })).reduce((acc, pair) => {
         acc[pair.symbol] = pair
         return acc
       }, {}))
@@ -427,8 +418,11 @@ ${'= '.repeat(30)}
       // }, {}))
     }
 
-    console.log(`time: ${Date.now() - start}ms`)
-
+    console.log(
+      `    time: ${Date.now() - start}ms
+    BTC ${parseStepSize(this.userTotalBtc)} - USD ${parseStepSize(this.userTotalBtc * this.prices['BTCUSDT'])}
+${'= '.repeat(30)}`
+    )
   }
 
 }
