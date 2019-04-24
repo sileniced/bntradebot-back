@@ -141,6 +141,7 @@ class Analysis implements IAnalysis {
             (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
             + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
             + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
+            /* todo: HIER MOET NOG IETS, The average change of the last 2 candles */
           ) * this.intervalWeights[j]
         }))
       }
@@ -163,6 +164,8 @@ class Analysis implements IAnalysis {
           ? [acc[0] - quoteScore / src.length, acc[1]]
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
+
+      /* todo: HIER MOET NOG IETS: de quote symbols need to battle it out */
 
       const quoteMultiplier = Math.pow(quoteScore + 1, quoteScore + 2)
       this.marketQuoteScore[quoteSymbol] = {

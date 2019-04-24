@@ -101,7 +101,7 @@ class Logger implements ILogger {
       const worst = data[(data.length - 1) - i].title
       logRow([
         best.length > 99 ? best.slice(0, 95) + '...' : best,
-        worst.length > 99 ? best.slice(0, 95) + '...' : best
+        worst.length > 99 ? worst.slice(0, 95) + '...' : worst
       ], '', 100)
     }
     console.log('')

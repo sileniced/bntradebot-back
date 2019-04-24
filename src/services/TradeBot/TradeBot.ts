@@ -261,6 +261,9 @@ class TradeBot {
         this.negotiationTable.addCandidatePair(candidatePair as ParticipantPair)
         this.prices[candidatePair.pair] = candidatePair.price
       }
+
+      /* todo: HIER MOET NOG IETS, WANNEER EEN COLLECTOR GEEN PAIR HEEFT */
+
     }
 
     this.negotiationTable.run()
