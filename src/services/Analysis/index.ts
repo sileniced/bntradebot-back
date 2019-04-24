@@ -1,4 +1,4 @@
-import { CandleChartInterval, Symbol } from 'binance-api-node'
+import { CandleChartInterval, OrderSide, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
 import { Binance } from '../../index'
@@ -6,17 +6,13 @@ import Oscillators from './Oscillators'
 import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
 import AnalysisNews from './NewsAnalysis'
+import Logger from '../Logger'
 
-export interface PairScore {
-  _pairScore: number,
-  base: {
-    symbol: string,
-    score: number
-  },
-  quote: {
-    symbol: string,
-    score: number
-  }
+export interface AssignedPair {
+  pair: string,
+  side: OrderSide,
+  provider: string,
+  collector: string
 }
 
 export interface AnalysisInput {
@@ -25,20 +21,25 @@ export interface AnalysisInput {
 }
 
 export interface MarketAnalysisResult {
+  quoteSymbol: string,
   score: number,
   multiplier: number
   poweredScore: number
 }
 
 export interface IAnalysis {
-  run(): Promise<void>,
+  run(logger: Logger): Promise<void>,
 
-  apiCalls: number
-  techAnalysis: { [pair: string]: number },
-  techSymbolAnalysis: { [symbol: string]: number },
-  newsAnalysis: AnalysisNews,
+  techPairScore: { [pair: string]: number }
+  techSymbolScore: { [symbol: string]: number }
+
+  marketQuoteScore: { [quoteSymbol: string]: MarketAnalysisResult }
+  marketSymbolScore: { [symbol: string]: number }
+
+  assignedPair: { [pair: string]: AssignedPair }
+
+  newsScore: AnalysisNews
   symbolPie: { [pair: string]: number }
-  pairAnalysis: { [pair: string]: PairScore }
 }
 
 class Analysis implements IAnalysis {
@@ -56,17 +57,22 @@ class Analysis implements IAnalysis {
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
   private readonly quoteSymbols: string[] = []
-  private readonly pairsPerSymbol: { [symbol: string]: Symbol[] } = {}
+  public readonly pairsPerSymbol: { [symbol: string]: Symbol[] } = {}
 
-  public techAnalysis: { [pair: string]: number } = {}
-  public techSymbolAnalysis: { [symbol: string]: number } = {}
-  public newsAnalysis: AnalysisNews
-  public marketAnalysis: { [quoteSymbol: string]: MarketAnalysisResult } = {}
-  public pairAnalysis: { [pair: string]: PairScore } = {}
+  public techPairScore: { [pair: string]: number } = {}
+  public techSymbolScore: { [symbol: string]: number } = {}
+
+  public marketQuoteScore: { [quoteSymbol: string]: MarketAnalysisResult } = {}
+  public marketSymbolScore: { [symbol: string]: number } = {}
+
+  public assignedPair: { [pair: string]: AssignedPair } = {}
+
+  public newsScore: AnalysisNews
   public symbolPie: { [pair: string]: number } = {}
 
   private symbolTotals: { [pair: string]: number } = {}
   private allTotals: number = 0
+
 
   constructor({ pairsInfo, getNormalizedSymbols }: AnalysisInput) {
 
@@ -79,11 +85,17 @@ class Analysis implements IAnalysis {
       return acc
     }, {}))
 
-    this.techSymbolAnalysis = getNormalizedSymbols()
+    this.techPairScore = this.pairs.reduce((acc, pair) => {
+      acc[pair] = 0
+      return acc
+    }, {})
+    this.techSymbolScore = getNormalizedSymbols()
+    this.marketSymbolScore = getNormalizedSymbols()
     this.symbolPie = getNormalizedSymbols()
     this.symbolTotals = getNormalizedSymbols()
 
-    this.marketAnalysis['ALTS'] = {
+    this.marketQuoteScore['ALTS'] = {
+      quoteSymbol: 'ALTS',
       score: 0,
       multiplier: 0,
       poweredScore: 0
@@ -110,103 +122,116 @@ class Analysis implements IAnalysis {
     }, {})
   }
 
-  public async run(): Promise<void> {
+  public async run(logger: Logger): Promise<void> {
     const start = Date.now()
 
-    this.newsAnalysis = new AnalysisNews({ symbols: this.symbols })
-    const newsAnalysisPromise = this.newsAnalysis.run()
+    this.newsScore = new AnalysisNews({ symbols: this.symbols })
+    const newsAnalysisPromise = this.newsScore.run(logger)
 
-    const techAnalysisPromises: Promise<[string, number]>[] = []
+    const techAnalysisPromises: Promise<void>[] = []
 
-    this.pairs.forEach(pair => {
-      this.intervalList.forEach(interval => {
-        this.apiCalls++
-        techAnalysisPromises.push(Binance.getCandlesStockData(pair, interval)
-        .then((candles: StockData) => [
-          pair, (
-            (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
-            + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
-            + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage))
-          * this.intervalWeights[this.intervalList.indexOf(interval)]
-        ]))
-      })
-    })
+    /** this.techPairScore[pair] = */
+    const pen = this.pairs.length
+    const ien = this.intervalList.length
+    for (let i = 0; i < pen; i++) {
+      for (let j = 0; j < ien; j++) {
+        techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
+        .then((candles: StockData) => {
+          this.techPairScore[this.pairs[i]] += (
+              (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
+              + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
+              + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
+            ) * this.intervalWeights[j]
+        }))
+      }
+    }
 
-    /** this.techAnalysis[pair] = */
     await Promise.all(techAnalysisPromises)
-    .then(pairInterval => pairInterval.forEach(([pair, score]) => {
-      if (!this.techAnalysis[pair]) this.techAnalysis[pair] = 0
-      this.techAnalysis[pair] += score
-    }))
 
-    /** this.marketAnalysis[quoteSymbol | altsMarket] = */
-    this.quoteSymbols.forEach(quoteSymbol => {
+    this.apiCalls = techAnalysisPromises.length
+
+    /** this.marketQuoteScore[quoteSymbol | altsMarket] = */
+    const qen = this.quoteSymbols.length
+    for (let i = 0; i < qen; i++) {
+      const quoteSymbol = this.quoteSymbols[i]
+
       const [baseScore, quoteScore] = this.pairsPerSymbol[quoteSymbol]
       .filter(pair => pair.quoteAsset === quoteSymbol)
       .reduce((acc, pair, _, src) => {
-        const quoteScore = -(this.techAnalysis[pair.symbol] - 0.5) * 2
+        const quoteScore = -(this.techPairScore[pair.symbol] - 0.5) * 2
         return quoteScore < 0
           ? [acc[0] - quoteScore / src.length, acc[1]]
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
 
-      const quoteMultiplier = Math.pow(quoteScore + 1, baseScore + 2)
-      const baseMultiplier = Math.pow(baseScore + 1, baseScore + 2)
 
-      this.marketAnalysis[quoteSymbol] = {
+      const quoteMultiplier = Math.pow(quoteScore + 1, quoteScore + 2)
+      this.marketQuoteScore[quoteSymbol] = {
+        quoteSymbol,
         score: quoteScore,
         multiplier: quoteMultiplier,
         poweredScore: quoteScore * quoteMultiplier
       }
+      logger.addMarketAnalysis(this.marketQuoteScore[quoteSymbol])
 
-      this.marketAnalysis['ALTS'].score += baseScore / this.quoteSymbols.length
-      this.marketAnalysis['ALTS'].multiplier += baseMultiplier / this.quoteSymbols.length
-      this.marketAnalysis['ALTS'].poweredScore += baseScore * baseMultiplier / this.quoteSymbols.length
-    })
+      const baseMultiplier = Math.pow(baseScore + 1, baseScore + 2)
+      this.marketQuoteScore['ALTS'].score += baseScore / qen
+      this.marketQuoteScore['ALTS'].multiplier += baseMultiplier / qen
+      this.marketQuoteScore['ALTS'].poweredScore += baseScore * baseMultiplier / qen
+    }
 
-    /** this.techSymbolAnalysis[symbol] = */
-    /** this.pairAnalysis[symbol] = */
-    this.pairsInfo.forEach(pair => {
-      const pairTechScore = this.techAnalysis[pair.symbol]
+    logger.addMarketAnalysis(this.marketQuoteScore['ALTS'])
+    logger.marketAnalysis()
 
-      function pairToSymbols(pairScore) {
-        const baseScore = (pairScore - 0.5) * 2
-        return baseScore > 0 ? [baseScore, 0] : [0, -baseScore]
+    /** this.techSymbolScore[symbol] = */
+    /** this.marketSymbolScore[symbol] = */
+    for (let i = 0; i < pen; i++) {
+      const pair = this.pairsInfo[i]
+      const baseScore = (this.techPairScore[pair.symbol] - 0.5) * 2
+      const side = baseScore > 0 ? 'BUY' : 'SELL'
+      this.assignedPair[pair.symbol] = baseScore > 0 ? {
+        pair: pair.symbol,
+        side: side,
+        provider: pair.quoteAsset,
+        collector: pair.baseAsset
+      } : {
+        pair: pair.symbol,
+        side: side,
+        provider: pair.baseAsset,
+        collector: pair.quoteAsset
       }
+      const collector = this.assignedPair[pair.symbol].collector
+      const marketQuoteSymbol = this.quoteSymbols.includes(collector) ? collector : 'ALTS'
+      const marketMultiplier = this.marketQuoteScore[marketQuoteSymbol].multiplier
+      const altDivider = (marketQuoteSymbol === 'ALTS' ? qen : 1)
+      this.techSymbolScore[collector] += Math.abs(baseScore) / this.pairsPerSymbol[collector].length
+      this.marketSymbolScore[collector] += (this.techSymbolScore[collector] * marketMultiplier) / altDivider
 
-      const [baseTechScore, quoteTechScore] = pairToSymbols(pairTechScore)
+      logger.addPairAnalysis({
+        pair: pair.symbol,
+        side,
+        score: this.techPairScore[pair.symbol],
+        symbolScore: this.marketSymbolScore[collector]
+      })
+    }
 
-      this.techSymbolAnalysis[pair.baseAsset] += baseTechScore / this.pairsPerSymbol[pair.baseAsset].length
-      this.techSymbolAnalysis[pair.quoteAsset] += quoteTechScore / this.pairsPerSymbol[pair.quoteAsset].length
-
-      const addMarketMultiplier = symbol => this.marketAnalysis[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].multiplier
-
-      this.pairAnalysis[pair.symbol] = {
-        _pairScore: pairTechScore,
-        base: {
-          symbol: pair.baseAsset,
-          score: baseTechScore * addMarketMultiplier(pair.baseAsset)
-        },
-        quote: {
-          symbol: pair.quoteAsset,
-          score: quoteTechScore * addMarketMultiplier(pair.quoteAsset)
-        }
-      }
-    })
+    logger.pairAnalysis()
 
     await newsAnalysisPromise
+    logger.newsPosts()
 
-    this.symbols.forEach(symbol => {
-      this.symbolTotals[symbol] += this.marketAnalysis[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
-      this.symbolTotals[symbol] += this.techSymbolAnalysis[symbol] * this.symbolPieWeights.tech
-      this.symbolTotals[symbol] += (this.newsAnalysis.symbolAnalysis[symbol] < 0 ? 0 : this.newsAnalysis.symbolAnalysis[symbol]) * this.symbolPieWeights.news
+    const sen = this.symbols.length
+    for (let i = 0; i < sen; i ++) {
+      const symbol = this.symbols[i]
+      this.symbolTotals[symbol] += this.marketQuoteScore[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
+      this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
+      this.symbolTotals[symbol] += (this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]) * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
-    })
+    }
 
     /** this.symbolPie = */
-    this.symbols.forEach(symbol => {
-      this.symbolPie[symbol] += this.symbolTotals[symbol] / this.allTotals
-    })
+    for (let i = 0; i < sen; i ++) this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
+
 
     console.log(`analysis time: ${Date.now() - start}ms`)
   }

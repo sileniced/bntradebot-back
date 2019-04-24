@@ -1,18 +1,15 @@
-import { NewOrder, OrderSide } from 'binance-api-node'
+import { CandidatePair, FinalPair } from './TradeBot'
+import { AssignedPair } from '../Analysis'
 
-export interface ParticipatingPair {
-  pair: string,
-  price: number,
-  side: OrderSide,
-  provider: Provider,
-  collector: Collector,
+export interface ParticipantPair extends AssignedPair {
   collectorScore: number,
-  stepSize: number,
   minBase: number,
   minQuote: number,
+  stepSize: number,
+  price: number,
   providerFundsBtc?: number,
-  collectorAmountBtc?: number
-  baseAmount?: number
+  collectorAmountBtc?: number,
+  baseAmount?: number,
   quoteAmount?: number
 }
 
@@ -22,142 +19,180 @@ export interface Provider {
   totalSpendableBtc: number,
   spendable: number,
   spendableBtc: number,
+  logger: string,
 }
 
 export interface Collector {
   collectorSymbol: string,
   demandBtc: number,
   demand: number,
+  logger: string
 }
 
 export interface NegotiationTableInput {
-  participatingPairs: ParticipatingPair[],
-  providers: Provider[],
-  collectors: Collector[],
-  dropPair: (candidatePair: ParticipatingPair, reason: string) => boolean
-  addToFinalPairs: (order: NewOrder, btcValue: number) => void
+  dropPair: (candidatePair: CandidatePair, dropCode: number) => boolean
+  addToFinalPairs: (pair: FinalPair) => void
 }
 
 function parseStepSize(qty: number, stepSize: number) {
   return Math.floor(qty / stepSize) / (1 / stepSize)
 }
 
-class NegotiationTable {
+interface INegotiationTable {
+  providerFundsBtc: { [providerSymbol: string]: number }
+  providerFunds: { [providerSymbol: string]: number }
+  collectorAmountBtc: { [collectorSymbol: string]: number }
+  collectorAmount: { [collectorSymbol: string]: number }
+}
 
-  private readonly pairs: ParticipatingPair[] = []
-  private readonly dropPair: (pair: ParticipatingPair, reason: string) => boolean
-  private readonly addToFinalPairs: (order: NewOrder, btcValue: number) => void
+class NegotiationTable implements INegotiationTable {
 
-  private providerFundsBtc: { [providerSymbol: string]: number } = {}
-  private providerFunds: { [providerSymbol: string]: number } = {}
+  private candidatePairs: ParticipantPair[] = []
+
+  private readonly dropPair: (pair: ParticipantPair, dropCode: number) => boolean
+  private readonly addToFinalPairs: (pair: FinalPair) => void
+
+  public providerFundsBtc: { [providerSymbol: string]: number } = {}
+  public providerFunds: { [providerSymbol: string]: number } = {}
   private providerTotalFundsBtc: { [providerSymbol: string]: number } = {}
   private providerTotalFunds: { [providerSymbol: string]: number } = {}
 
-  private collectorAmountBtc: { [collectorSymbol: string]: number } = {}
-  private collectorAmount: { [collectorSymbol: string]: number } = {}
+  public collectorAmountBtc: { [collectorSymbol: string]: number } = {}
+  public collectorAmount: { [collectorSymbol: string]: number } = {}
 
-  constructor({ participatingPairs, providers, collectors, dropPair, addToFinalPairs }: NegotiationTableInput) {
-    this.pairs = participatingPairs
+  constructor({ dropPair, addToFinalPairs }: NegotiationTableInput) {
     this.dropPair = dropPair
     this.addToFinalPairs = addToFinalPairs
+  }
 
-    providers.forEach(provider => {
-      this.providerFundsBtc[provider.providerSymbol] = provider.spendableBtc
-      this.providerFunds[provider.providerSymbol] = provider.spendable
-      this.providerTotalFundsBtc[provider.providerSymbol] = provider.totalSpendableBtc
-      this.providerTotalFunds[provider.providerSymbol] = provider.totalSpendable
-    })
+  public addProvider = (provider: Provider): void => {
+    this.providerFundsBtc[provider.providerSymbol] = provider.spendableBtc
+    this.providerFunds[provider.providerSymbol] = provider.spendable
+    this.providerTotalFundsBtc[provider.providerSymbol] = provider.totalSpendableBtc
+    this.providerTotalFunds[provider.providerSymbol] = provider.totalSpendable
+  }
 
-    collectors.forEach(demand => {
-      this.collectorAmountBtc[demand.collectorSymbol] = demand.demandBtc
-      this.collectorAmount[demand.collectorSymbol] = demand.demand
-    })
+  public addCollector = (demand: Collector): void => {
+    this.collectorAmountBtc[demand.collectorSymbol] = demand.demandBtc
+    this.collectorAmount[demand.collectorSymbol] = demand.demand
+  }
+
+  public addCandidatePair = (pair: ParticipantPair) => {
+    this.candidatePairs.push(pair)
   }
 
   public run() {
-    this.pairs.forEach(pair => {
-      pair.providerFundsBtc = this.providerFundsBtc[pair.provider.providerSymbol]
-      if (pair.providerFundsBtc > 0) {
-        pair.collectorAmountBtc = this.collectorAmountBtc[pair.collector.collectorSymbol]
-        if (pair.collectorAmountBtc > 0) {
-          if (pair.providerFundsBtc > pair.collectorAmountBtc) {
-            if (pair.side === 'BUY') {
-              pair.baseAmount = parseStepSize(this.collectorAmount[pair.collector.collectorSymbol], pair.stepSize) // collector
-              pair.quoteAmount = pair.baseAmount * pair.price // provider
-              if (pair.baseAmount > pair.minBase) {
-                if (pair.quoteAmount > pair.minQuote) {
-                  this.addToFinalPairs({
-                    symbol: pair.pair,
-                    side: pair.side,
-                    quantity: pair.baseAmount.toString(),
-                    type: 'MARKET'
-                  }, pair.collectorAmountBtc)
-                  this.providerFundsBtc[pair.provider.providerSymbol] -= pair.collectorAmountBtc
-                  this.providerFunds[pair.provider.providerSymbol] -= pair.quoteAmount
-                  this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
-                  this.collectorAmount[pair.collector.collectorSymbol] = 0
-                } else this.dropPair(pair, 'prov quote<minQuote')
-              } else this.dropPair(pair, 'coll base<minBase')
-            } else {
-              pair.quoteAmount = this.collectorAmount[pair.collector.collectorSymbol] // collector
-              pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize) // provider
-              if (pair.baseAmount > pair.minBase) {
-                if (pair.quoteAmount > pair.minQuote) {
-                  this.addToFinalPairs({
-                    symbol: pair.pair,
-                    side: pair.side,
-                    quantity: pair.baseAmount.toString(),
-                    type: 'MARKET'
-                  }, pair.collectorAmountBtc)
-                  this.providerFundsBtc[pair.provider.providerSymbol] -= pair.collectorAmountBtc
-                  this.providerFunds[pair.provider.providerSymbol] -= pair.baseAmount
-                  this.collectorAmountBtc[pair.collector.collectorSymbol] = 0
-                  this.collectorAmount[pair.collector.collectorSymbol] = 0
-                } else this.dropPair(pair, 'coll quote<minQuote')
-              } else this.dropPair(pair, 'prov base<minBase')
-            }
-          } else if (pair.providerFundsBtc < pair.collectorAmountBtc) {
-            if (pair.side === 'BUY') {
-              pair.quoteAmount = this.providerFunds[pair.provider.providerSymbol] // provider
-              pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize) // collector
-              if (pair.baseAmount > pair.minBase) {
-                if (pair.quoteAmount > pair.minQuote) {
-                  this.addToFinalPairs({
-                    symbol: pair.pair,
-                    side: pair.side,
-                    quantity: pair.baseAmount.toString(),
-                    type: 'MARKET'
-                  }, pair.providerFundsBtc)
-                  this.collectorAmountBtc[pair.collector.collectorSymbol] -= pair.providerFundsBtc
-                  this.collectorAmount[pair.collector.collectorSymbol] -= pair.quoteAmount
-                  this.providerFundsBtc[pair.provider.providerSymbol] = 0
-                  this.providerFunds[pair.provider.providerSymbol] = 0
-                } else this.dropPair(pair, 'prov quote<minQuote')
-              } else this.dropPair(pair, 'coll base<minBase')
-            } else {
-              pair.baseAmount = parseStepSize(this.providerFunds[pair.provider.providerSymbol], pair.stepSize) // provider
-              pair.quoteAmount = pair.baseAmount * pair.price // collector
-              if (pair.baseAmount > pair.minBase) {
-                if (pair.quoteAmount > pair.minQuote) {
-                  this.addToFinalPairs({
-                    symbol: pair.pair,
-                    side: pair.side,
-                    quantity: pair.baseAmount.toString(),
-                    type: 'MARKET'
-                  }, pair.providerFundsBtc)
-                  this.collectorAmountBtc[pair.collector.collectorSymbol] -= pair.providerFundsBtc
-                  this.collectorAmount[pair.collector.collectorSymbol] -= pair.baseAmount
-                  this.providerFundsBtc[pair.provider.providerSymbol] = 0
-                  this.providerFunds[pair.provider.providerSymbol] = 0
-                } else this.dropPair(pair, 'coll quote<minQuote')
-              } else this.dropPair(pair, 'prov base<minBase')
-            }
-          }
-        } else this.dropPair(pair, 'collector satisfied')
-      } else this.dropPair(pair, 'provider dry')
-    }, [] as NewOrder[])
-  }
+    this.candidatePairs.sort((a, b) => b.collectorScore - a.collectorScore)
+    for (let i = 0, len = this.candidatePairs.length; i < len; i++) {
+      const pair = this.candidatePairs[i]
 
+      pair.providerFundsBtc = this.providerFundsBtc[pair.provider]
+      if (pair.providerFundsBtc <= 0) {
+        this.dropPair(pair, 6)
+        continue
+      }
+
+      pair.collectorAmountBtc = this.collectorAmountBtc[pair.collector]
+      if (pair.collectorAmountBtc <= 0) {
+        this.dropPair(pair, 7)
+        continue
+      }
+
+      if (pair.providerFundsBtc > pair.collectorAmountBtc) {
+
+        if (pair.side === 'BUY') {
+
+          // collector
+          pair.baseAmount = parseStepSize(this.collectorAmount[pair.collector], pair.stepSize)
+          if (pair.baseAmount < pair.minBase) {
+            this.dropPair(pair, 8)
+            continue
+          }
+
+          // provider
+          pair.quoteAmount = pair.baseAmount * pair.price
+          if (pair.quoteAmount < pair.minQuote) {
+            this.dropPair(pair, 9)
+            continue
+          }
+
+          this.providerFunds[pair.provider] -= pair.quoteAmount
+
+        } else {
+
+          // collector
+          pair.quoteAmount = this.collectorAmount[pair.collector]
+          if (pair.quoteAmount < pair.minQuote) {
+            this.dropPair(pair, 10)
+            continue
+          }
+
+          // provider
+          pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize)
+          if (pair.baseAmount < pair.minBase) {
+            this.dropPair(pair, 11)
+            continue
+          }
+
+          this.providerFunds[pair.provider] -= pair.baseAmount
+        }
+
+        this.providerFundsBtc[pair.provider] -= pair.collectorAmountBtc
+        this.collectorAmountBtc[pair.collector] = 0
+        this.collectorAmount[pair.collector] = 0
+
+      } else if (pair.providerFundsBtc < pair.collectorAmountBtc) {
+
+        if (pair.side === 'BUY') {
+
+          // provider
+          pair.quoteAmount = this.providerFunds[pair.provider]
+          if (pair.quoteAmount < pair.minQuote) {
+            this.dropPair(pair, 9)
+            continue
+          }
+
+          // collector
+          pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize)
+          if (pair.baseAmount < pair.minBase) {
+            this.dropPair(pair, 8)
+            continue
+          }
+
+          this.collectorAmount[pair.collector] -= pair.baseAmount
+
+        } else {
+
+          // provider
+          pair.baseAmount = parseStepSize(this.providerFunds[pair.provider], pair.stepSize)
+          if (pair.baseAmount < pair.minBase) {
+            this.dropPair(pair, 11)
+            continue
+          }
+
+          // collector
+          pair.quoteAmount = pair.baseAmount * pair.price
+          if (pair.quoteAmount < pair.minQuote) {
+            this.dropPair(pair, 10)
+            continue
+          }
+
+          this.collectorAmount[pair.collector] -= pair.quoteAmount
+
+        }
+
+        this.collectorAmountBtc[pair.collector] -= pair.providerFundsBtc
+        this.providerFundsBtc[pair.provider] = 0
+        this.providerFunds[pair.provider] = 0
+
+      } else {
+        this.dropPair(pair, 12)
+        continue
+      }
+
+      this.addToFinalPairs(pair as FinalPair)
+    }
+  }
 }
 
 export default NegotiationTable

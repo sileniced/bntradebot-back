@@ -57,20 +57,6 @@ class BinanceApi {
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
     this.activeTradeBotUserIds.forEach(id => {
-      // tradebot(this.activeTradeBotUsers[id]).then(result => {
-      //   const log = this.beautifulLog(result)
-      //   console.log(log[0])
-      //   console.table(result.data.pieChart)
-      //   console.log(log[1])
-      //   console.table(result.data.candidateAnalysis)
-      //   console.log(log[2])
-      //   console.table(result.data.negotiationOrders)
-      //   console.log(log[3])
-      //   console.table(result.data.finalOrders)
-      //   console.log(log[4])
-      //   console.table(result.data.ordersResult)
-      //
-      // })
       new TradeBot(this.activeTradeBotUsers[id]).run()
     })
   }

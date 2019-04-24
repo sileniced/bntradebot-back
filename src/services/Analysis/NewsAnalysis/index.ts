@@ -2,6 +2,7 @@ import * as request from 'superagent'
 import { CryptoPanicLink } from '../../../constants'
 import { Response } from 'superagent'
 import Scoring, { PostAnalysisResult } from './Scoring'
+import Logger from '../../Logger'
 
 interface AnalysisNewsInput {
   symbols: string[]
@@ -32,7 +33,7 @@ interface SymbolAnalysisTotals {
 interface IAnalysisNews {
   symbolAnalysis: { [symbol: string]: number }
 
-  run(): Promise<void>
+  run(logger: Logger): Promise<void>
 }
 
 class AnalysisNews implements IAnalysisNews {
@@ -75,13 +76,15 @@ class AnalysisNews implements IAnalysisNews {
     }, {})
   }
 
-  public run() {
+  public run(logger: Logger) {
     return Promise.all(this.pages.map((page: number) => {
       return new Promise(resolve => setTimeout(() => {
         resolve(this.cryptoPanicApi(this.symbols, page)
         .then((posts: CryptoPanicPost[]) => {
-          posts.forEach(post => {
-            post.currencies.forEach(({ code: symbol }) => {
+          for (let i = 0, len = posts.length; i < len; i++) {
+            const post = posts[i]
+            for (let j = 0, jen = post.currencies.length; j < jen; j++) {
+              const symbol = post.currencies[j].code
               if (this.symbols.includes(symbol)) {
                 const postScore: PostAnalysisResult = Scoring(post.votes)
                 const age = Date.now() - Date.parse(post.published_at)
@@ -90,14 +93,16 @@ class AnalysisNews implements IAnalysisNews {
                 this.symbolAnalysisTotals[symbol].postWeightsTotal += postScore._postWeight
                 this.symbolAnalysisTotals[symbol].votesTotal += postScore._totalVotes
                 this.symbolAnalysisTotals[symbol].agesTotal += age
+                logger.addNewsPosts({ title: post.title, score: postScore._score })
               }
-            })
-          })
+            }
+          }
         }))
       }, Math.floor((page - 1) / 5) * 1000))
     }))
     .then(() => {
-      this.symbols.forEach(symbol => {
+      for (let i = 0, len = this.symbols.length; i< len; i++) {
+        const symbol = this.symbols[1]
         this.symbolAnalysisTotals[symbol].weightedVotes.forEach((value, idx, src) => {
           const score = {
             post: value._score * value._postWeight / this.symbolAnalysisTotals[symbol].postWeightsTotal,
@@ -106,7 +111,7 @@ class AnalysisNews implements IAnalysisNews {
           }
           this.symbolAnalysis[symbol] += (score.post + score.vote + score.ages) / src.length
         })
-      })
+      }
     })
   }
 }
