@@ -7,6 +7,7 @@ import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
 import AnalysisNews from './NewsAnalysis'
 import Logger from '../Logger'
+import PriceChangeAnalysis from './PriceChangeAnalysis'
 
 export interface AssignedPair {
   pair: string,
@@ -51,7 +52,12 @@ class Analysis implements IAnalysis {
   private readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
   private readonly intervalWeights: number[] = [0.025236593, 0.075709779, 0.126182965, 0.378548896, 0.189274448, 0.094637224, 0.047318612, 0.023659306, 0.015772871, 0.011829653, 0.007886435, 0.003943218]
-  private readonly techAnalysisWeights = { oscillators: 0.45, candlesticks: 0.2, movingAverage: 0.35 }
+  private readonly techAnalysisWeights = {
+    candlesticks: 0.14,
+    oscillators: 0.29,
+    movingAverage: 0.29,
+    priceChange: 0.29
+  }
   private readonly symbolPieWeights = { tech: 0.5, news: 0.1, markets: 0.4 }
 
   private readonly symbols: string[] = []
@@ -137,11 +143,21 @@ class Analysis implements IAnalysis {
       for (let j = 0; j < ien; j++) {
         techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
         .then((candles: StockData) => {
+          if (this.pairs[i].includes('USDT') && this.intervalList[j] === '1d') {
+            console.table({
+              pair: this.pairs[i],
+              interval: this.intervalList[j],
+              candle: CandleStickAnalysis(candles)._score,
+              osc: Oscillators(candles)._score,
+              ma: MovingAverages(candles)._score,
+              pc: PriceChangeAnalysis(candles)
+            })
+          }
           this.techPairScore[this.pairs[i]] += (
             (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
             + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
             + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
-            /* todo: HIER MOET NOG IETS, The average change of the last 2 candles */
+            + (PriceChangeAnalysis(candles) * this.techAnalysisWeights.priceChange)
           ) * this.intervalWeights[j]
         }))
       }
@@ -167,19 +183,20 @@ class Analysis implements IAnalysis {
 
       /* todo: HIER MOET NOG IETS: de quote symbols need to battle it out */
 
-      const quoteMultiplier = Math.pow(quoteScore + 1, quoteScore + 2)
+      const quoteMultiplier = Math.sqrt(quoteScore)
+      const baseMultiplier = Math.sqrt(baseScore)
+
       this.marketQuoteScore[quoteSymbol] = {
         quoteSymbol,
         score: quoteScore,
         multiplier: quoteMultiplier,
-        poweredScore: quoteScore * quoteMultiplier
+        poweredScore: quoteScore + quoteMultiplier
       }
       logger.addMarketAnalysis(this.marketQuoteScore[quoteSymbol])
 
-      const baseMultiplier = Math.pow(baseScore + 1, baseScore + 2)
       this.marketQuoteScore['ALTS'].score += baseScore / qen
       this.marketQuoteScore['ALTS'].multiplier += baseMultiplier / qen
-      this.marketQuoteScore['ALTS'].poweredScore += baseScore * baseMultiplier / qen
+      this.marketQuoteScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
     }
 
     logger.addMarketAnalysis(this.marketQuoteScore['ALTS'])
@@ -204,11 +221,11 @@ class Analysis implements IAnalysis {
       }
       const collector = this.assignedPair[pair.symbol].collector
       const marketQuoteSymbol = this.quoteSymbols.includes(collector) ? collector : 'ALTS'
-      const marketMultiplier = this.marketQuoteScore[marketQuoteSymbol].multiplier
+      const poweredScore = this.marketQuoteScore[marketQuoteSymbol].poweredScore
       const altDivider = (marketQuoteSymbol === 'ALTS' ? qen : 1)
       this.techSymbolScore[collector] += Math.abs(baseScore) / this.pairsPerSymbol[collector].length
-      this.marketSymbolScore[collector] += (this.techSymbolScore[collector] * marketMultiplier) / altDivider
-      this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] * marketMultiplier) / altDivider
+      this.marketSymbolScore[collector] += (this.techSymbolScore[collector] + poweredScore) / altDivider
+      this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] + poweredScore) / altDivider
 
       logger.addPairAnalysis({
         pair: pair.symbol,

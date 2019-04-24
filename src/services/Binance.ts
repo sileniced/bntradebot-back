@@ -19,7 +19,7 @@ import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
 
-interface RealOrderResult {
+export interface RealOrderResult {
   clientOrderId: string;
   executedQty: string;
   cummulativeQuoteQty: string;
@@ -40,6 +40,7 @@ interface RealOrderResult {
 export interface TestOrderResult {
   feeDollars: number,
   pair: string,
+  orderId: string
 }
 
 class BinanceApi {
@@ -153,6 +154,7 @@ class BinanceApi {
     .then((result: any) => {
       result.pair = order.symbol
       result.feeDollars = feeDollars
+      result.orderId = 'true'
       return result
     })
     .catch(error => {

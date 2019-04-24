@@ -154,7 +154,7 @@ class TradeBot {
             quantity: pair.baseAmount.toString(),
             type: 'MARKET'
           }).then(result => {
-            pair.success = !!result
+            pair.success = !!result.orderId
             logger.addTrade(pair)
             return pair
           })
