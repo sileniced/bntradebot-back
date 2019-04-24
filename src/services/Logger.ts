@@ -1,4 +1,5 @@
 import { MarketAnalysisResult } from './Analysis'
+import { DroppedPair, FinalPair } from './TradeBot/TradeBot'
 
 function parseValue(value: any) {
   switch (typeof value) {
@@ -36,6 +37,22 @@ interface ILogger {
 
 class Logger implements ILogger {
 
+  public startLog = (totalBalance: { btc: number, dollar: number, btcPrice: number }) => {
+    console.log('')
+    logRow(Array(40).fill(' _ '), '', 3)
+    console.log('')
+    const date = new Date()
+    logRow(['Date', 'Time', 'BTC', 'USDT', 'BTCUSDT'], ' ')
+    logRow([
+      date.toLocaleDateString('nl-NL'),
+      date.toLocaleTimeString('nl-NL'),
+      totalBalance.btc,
+      totalBalance.dollar,
+      totalBalance.btcPrice
+    ], ' ')
+    console.log('')
+  }
+
   private _marketAnalysis: MarketAnalysisResult[] = []
   public addMarketAnalysis = (analysis: MarketAnalysisResult) => {
     this._marketAnalysis.push(analysis)
@@ -65,9 +82,13 @@ class Logger implements ILogger {
     console.log('')
   }
 
+  private _newsPostsTitles: string[] = []
   private _newsPosts: { title: string, score: number }[] = []
   public addNewsPosts = (analysis: { title: string, score: number }) => {
-    this._newsPosts.push(analysis)
+    if (!this._newsPostsTitles.includes(analysis.title)) {
+      this._newsPosts.push(analysis)
+      this._newsPostsTitles.push(analysis.title)
+    }
   }
 
   public newsPosts = (): void => {
@@ -80,138 +101,116 @@ class Logger implements ILogger {
     console.log('')
   }
 
+  private symbolOrder: string[] = []
+
   private _symbolPie: {}[] = []
   public addSymbolPie = (pie) => this._symbolPie[pie.name] = pie.values
   public symbolPie = () => {
-    console.log(this._symbolPie)
     console.log(`SYMBOLPIE`)
-    const data = Object.entries(this._symbolPie['$ Diff']).sort((a: [string, number], b: [string, number]) => a[1] - b[1])
-    logRow(data.map(([symbol]) => symbol), 'Symbol')
-    logRow(data.map(([symbol]) => this._symbolPie['$ Balance'][symbol] ),'$ Balance')
-    logRow(data.map(([symbol]) => this._symbolPie['$ SymbolPie'][symbol] ), '$ SymbolPie')
-    logRow(data.map(([symbol]) => this._symbolPie['$ Diff'][symbol] ), '$ Diff')
+    this.symbolOrder = Object.entries(this._symbolPie['$ Diff'])
+    .sort((a: [string, number], b: [string, number]) => a[1] - b[1])
+    .map(([symbol]) => symbol)
+    logRow(this.symbolOrder.map((symbol) => symbol), 'Symbol')
+    logRow(this.symbolOrder.map((symbol) => this._symbolPie['$ Balance'][symbol]), '$ Balance')
+    logRow(this.symbolOrder.map((symbol) => this._symbolPie['$ SymbolPie'][symbol]), '$ SymbolPie')
+    logRow(this.symbolOrder.map((symbol) => this._symbolPie['$ Diff'][symbol]), '$ Diff')
+    console.log('')
+  }
+
+  public startDroppedPairs = () => {
+    console.log('DROPPED PAIRS')
+    logRow(['Pair', 'Side', 'Provider', 'Collector', 'Reason'])
+  }
+
+  public droppedPair = (pair: DroppedPair) => {
+    const len = 15
+    const data: any[] = [pair.side, pair.provider, pair.collector]
+    switch (pair.dropCode) {
+      case 1:
+        logRow(data.concat(['score=0', ' ', pair.score.toFixed(8)]), pair.pair, len)
+        break
+      case 2:
+        logRow(data.concat(['coll<minBase', ' ', `${pair.collectorAmount && pair.collectorAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
+        break
+      case 3:
+        logRow(data.concat(['prov<minQuot', ' ', `${pair.providerFunds && pair.providerFunds.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
+        break
+      case 4:
+        logRow(data.concat(['prov<minBase', ' ', `${pair.providerFunds && pair.providerFunds.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
+        break
+      case 5:
+        logRow(data.concat(['coll<minQuote', ' ', `${pair.collectorAmount && pair.collectorAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
+        break
+      case 6:
+        logRow(data.concat(['funds dry', ' ', `collect: ${pair.collectorAmountBtc && pair.collectorAmountBtc.toFixed(8)}`]), pair.pair, len)
+        break
+      case 7:
+        logRow(data.concat(['coll done', ' ', `provide: ${pair.providerFundsBtc && pair.providerFundsBtc.toFixed(8)}`]), pair.pair, len)
+        break
+      case 8:
+        logRow(data.concat(['coll base<minBase', ' ', `${pair.baseAmount && pair.baseAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
+        break
+      case 9:
+        logRow(data.concat(['prov quot<minQuot', ' ', `${pair.quoteAmount && pair.quoteAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
+        break
+      case 10:
+        logRow(data.concat(['coll quot<minQuot', ' ', `${pair.quoteAmount && pair.quoteAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
+        break
+      case 11:
+        logRow(data.concat(['prov base<minBase', ' ', `${pair.baseAmount && pair.baseAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
+        break
+      case 12:
+        logRow(data.concat(['funds dry & coll done'], pair.pair, len))
+        break
+    }
+  }
+
+  private _trades: FinalPair[] = []
+  public addTrade = (pair: FinalPair) => {
+    this._trades.push(pair)
+  }
+
+  public hasTrades = (): boolean => this._trades.length > 0
+
+  public trades = () => {
+    console.log('')
+    console.log('TRADES')
+    logRow(['Pair', 'Side', 'Price', 'Collector', 'Base Amount', 'USDT Amount', 'Fee USDT Est', 'Status'])
+    for (let i = 0, len = this._trades.length; i < len; i++) {
+      const trade = this._trades[i]
+      logRow([trade.pair, trade.side, trade.price, trade.collector, trade.baseAmount, trade.dollarValue, trade.feeDollar, trade.success ? 'Success' : ''])
+    }
+    console.log('')
+  }
+
+  private _time: { [item: string]: number } = {}
+  public addTime = ({ item, time }) => {
+    this._time[item] = time
+  }
+
+  public endLog = ({ oldDollarBalance, newDollarBalance, btc, dollar, dollarDiff, tradeTime }: {
+    oldDollarBalance: {[symbol: string]: number}
+    newDollarBalance: {[symbol: string]: number}
+    btc: number,
+    dollar: number,
+    dollarDiff: number,
+    tradeTime: number,
+  }) => {
+
+    logRow(this.symbolOrder.map((symbol) => symbol), 'Symbol')
+    logRow(this.symbolOrder.map(symbol => oldDollarBalance[symbol]), 'old $')
+    logRow(this.symbolOrder.map(symbol => newDollarBalance[symbol]), 'new $')
+    logRow(this.symbolOrder.map(symbol => {
+      const cal = oldDollarBalance[symbol] - newDollarBalance[symbol]
+      return cal !== 0 ? cal : ' '
+    }), 'diff $')
+    console.log('')
+    logRow(['BTC', 'USDT', 'USDT Diff', 'run time', 'analysis time', 'news analysis time'])
+    logRow([btc, dollar, dollarDiff, `${tradeTime}ms`, `${this._time['analysis']}ms`, `${this._time['news']}ms`])
+    console.log('')
+    logRow(Array(40).fill(' _ '), '', 3)
   }
 
 }
 
 export default Logger
-
-// console.log('Market Analysis')
-// console.table(Object.entries(this.analysis.marketQuoteScore).reduce((acc, [title, pie]) => {
-//   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-//     acc[symbol] = parseStepSize(amount)
-//     return acc
-//   }, {})
-//   return acc
-// }, {}))
-
-// generateTable('SymbolPie', {
-// ['% balance']: this.userBalancePercentage,
-// ['% symbol pie']: this.analysis.symbolPie,
-// ['% difference']: this.differencePercentage,
-//   ['$ balance']: dollarBalance,
-//   ['$ symbol pie']: dollarSymbolPie,
-//   ['$ difference']: dollarDifference
-// })
-
-// console.log('SymbolPie:')
-// console.table(Object.entries({
-//   ['% balance']: this.userBalancePercentage,
-//   ['% symbol pie']: this.analysis.symbolPie,
-//   ['% difference']: this.differencePercentage,
-//   ['$ balance']: dollarBalance,
-//   ['$ symbol pie']: dollarSymbolPie,
-//   ['$ difference']: dollarDifference
-// }).reduce((acc, [title, pie]) => {
-//   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-//     acc[symbol] = parseStepSize(amount)
-//     return acc
-//   }, {})
-//   return acc
-// }, {}))
-
-// generateTable('Providers', this.providers)
-// console.log('Providers:')
-// console.table(Object.entries(this.providers).reduce((acc, [title, pie]) => {
-//   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-//     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-//     return acc
-//   }, {})
-//   return acc
-// }, {}))
-
-// generateTable('Collectors', this.collectors)
-// console.log('Collectors:')
-// console.table(Object.entries(this.collectors).reduce((acc, [title, pie]) => {
-//   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-//     acc[symbol] = typeof amount === 'number' ? parseStepSize(amount) : amount
-//     return acc
-//   }, {})
-//   return acc
-// }, {}))
-
-// generateTable('Participating Pairs', this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })).reduce((acc, pair) => {
-//   acc[pair.pair] = pair
-//   return acc
-// }, {}))
-// console.log('Participating Pairs:')
-// console.table(this.participatingPairs.map(pair => ({ ...pair, ...pair.provider, ...pair.collector })))
-
-// generateTable('Dropped Pairs', Object.values(this.DroppedPairs).map((pair): any => ({
-//   pair: pair.pair,
-//   side: pair.side,
-//   reason: pair.reason
-// minBase: pair.minBase,
-// baseAmount: parseStepSize(pair.baseAmount),
-// minQuote: pair.minQuote,
-// quoteAmount: parseStepSize(pair.quoteAmount),
-// provider: pair.provider.providerSymbol,
-// fundsBtc: parseStepSize(pair.providerFundsBtc),
-// spendableBtc: parseStepSize(pair.provider.spendableBtc),
-// spendable: parseStepSize(pair.provider.spendable),
-// collector: pair.collector.collectorSymbol,
-// amountBtc: parseStepSize(pair.collectorAmountBtc),
-// demandBtc: parseStepSize(pair.collector.demandBtc),
-// demand: parseStepSize(pair.collector.demand)
-// })).reduce((acc, pair) => {
-//   acc[pair.pair] = pair
-//   return acc
-// }, {}))
-
-// // console.log('Dropped Pairs:')
-// console.table(Object.values(this.DroppedPairs).map((pair): any => ({
-//   pair: pair.pair,
-//   side: pair.side,
-//   reason: pair.reason,
-//   minBase: pair.minBase,
-//   baseAmount: parseStepSize(pair.baseAmount),
-//   minQuote: pair.minQuote,
-//   quoteAmount: parseStepSize(pair.quoteAmount),
-//   provider: pair.provider.providerSymbol,
-//   fundsBtc: parseStepSize(pair.providerFundsBtc),
-//   spendableBtc: parseStepSize(pair.provider.spendableBtc),
-//   spendable: parseStepSize(pair.provider.spendable),
-//   collector: pair.collector.collectorSymbol,
-//   amountBtc: parseStepSize(pair.collectorAmountBtc),
-//   demandBtc: parseStepSize(pair.collector.demandBtc),
-//   demand: parseStepSize(pair.collector.demand)
-// })))
-
-// console.log('Final Pairs:')
-// console.table(this.finalPairs.map(pair => ({ ...pair.order, feeDollars: parseStepSize(pair.feeDollars)})))
-
-
-// console.log('Order Result:')
-// console.table(this.orderResult)
-
-// console.log('New Dollar Balance: ')
-// console.table(Object.entries({
-//   ['$ old balance']: dollarBalance,
-//   ['$ new balance']: newDollarBalance
-// }).reduce((acc, [title, pie]) => {
-//   acc[title] = Object.entries(pie).reduce((acc, [symbol, amount]) => {
-//     acc[symbol] = parseStepSize(amount)
-//     return acc
-//   }, {})
-//   return acc
-// }, {}))

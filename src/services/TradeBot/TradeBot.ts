@@ -1,40 +1,45 @@
 import User from '../../entities/User'
 import { Binance } from '../../index'
 import { OrderSide, Symbol } from 'binance-api-node'
-import NegotiationTable, { Collector, ParticipantPair, Provider } from './NegotiationTable'
+import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
-// import { TestOrderResult } from '../Binance'
 import Logger from '../Logger'
 
 export interface FinalPair extends ParticipantPair {
+  score: number,
   baseAmount: number
   baseSymbol: string
+  dollarValue: number
   feeDollar?: number
   success?: boolean
 }
 
 export interface CandidatePair extends AssignedPair {
-  collectorScore?: number,
-  minBase?: number,
-  minQuote?: number,
-  stepSize?: number,
-  price?: number,
+  collectorScore?: number
+  minBase?: number
+  minQuote?: number
+  stepSize?: number
+  price?: number
   baseSymbol?: string
+  score: number
 }
 
-interface DroppedPair {
-  pair: string,
-  price?: number,
-  side: OrderSide,
-  provider: Provider | string,
-  collector: Collector | string,
+export interface DroppedPair {
+  pair: string
+  score: number
+  price?: number
+  side: OrderSide
+  provider: string
+  collector: string
   pairScore?: number
-  minBase?: number,
-  minQuote?: number,
-  stepSize?: number,
-  dropCode: number,
-  providerFundsBtc?: number,
+  minBase?: number
+  minQuote?: number
+  stepSize?: number
+  dropCode: number
+  providerFundsBtc?: number
   collectorAmountBtc?: number
+  providerFunds?: number
+  collectorAmount?: number
   baseAmount?: number
   quoteAmount?: number
 }
@@ -59,13 +64,15 @@ class TradeBot {
   private differenceBtc: { [symbol: string]: number } = {}
   private difference: { [symbol: string]: number } = {}
 
-  private DroppedPairs: { [pair: string]: DroppedPair } = {}
+  // private DroppedPairs: { [pair: string]: DroppedPair } = {}
 
   private negotiationTable: NegotiationTable
 
-  private finalPairs: FinalPair[] = []
+  // private finalPairs: FinalPair[] = []
   // private orderResult: SavedOrder[] = []
   // private orderResultTest: TestOrderResult[] = []
+
+  private trades: Promise<FinalPair>[] = []
 
   constructor(user: User) {
 
@@ -84,7 +91,14 @@ class TradeBot {
   }
 
   public async run() {
+    const start = Date.now()
     const logger = new Logger()
+
+    const balancePromise = Binance.getAccountBalances(this.user.id)
+    const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
+
+    const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
+    const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
 
     await Binance.getPairs().then(pairInfo => {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
@@ -93,57 +107,58 @@ class TradeBot {
     this.analysis = new Analysis({ pairsInfo: this.pairsInfo, getNormalizedSymbols: this.getNormalizedSymbols })
     const analysisPromise = this.analysis.run(logger)
 
-    this.prices['BTCUSDT'] = await Binance.getAvgPrice('BTCUSDT')
-    this.prices['USDTBTC'] = 1 / this.prices['BTCUSDT']
-
-    const avgPricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
-    await Promise.all(avgPricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
-    .then(avgPricesBtc => {
-      for (let i = 0, len = avgPricesBtc.length; i < len; i++)
-        this.prices[avgPricesBtcNames[i]] = avgPricesBtc[i]
-    })
-
     const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
 
-    await Binance.getAccountBalances(this.user.id)
-    .then(balances => {
+    await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
+    .then(([btcUsdtPrice, pricesBtc, balances]) => {
+      this.prices['BTCUSDT'] = btcUsdtPrice
+      this.prices['USDTBTC'] = 1 / btcUsdtPrice
+
+      for (let i = 0, len = pricesBtc.length; i < len; i++)
+        this.prices[pricesBtcNames[i]] = pricesBtc[i]
+
       for (let i = 0, len = balances.length; i < len; i++) {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
         if (amount > 0 && this.symbols.includes(balance.asset)) {
+          this.balance[balance.asset] += amount
           this.balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
           dollarBalance[balance.asset] += this.balanceBtc[balance.asset] * this.prices['BTCUSDT']
           this.balanceTotalBtc += this.balanceBtc[balance.asset]
-          this.balance[balance.asset] += amount
-          this.balanceBtc[balance.asset] += this.balanceBtc[balance.asset]
         }
       }
+
     })
 
+    logger.startLog({
+      btc: this.balanceTotalBtc,
+      dollar: this.balanceTotalBtc * this.prices['BTCUSDT'],
+      btcPrice: this.prices['BTCUSDT']
+    })
     logger.addSymbolPie({ name: '$ Balance', values: dollarBalance })
 
-    const dropPair = (pair: CandidatePair | ParticipantPair | AssignedPair, dropCode: number): boolean => {
-      this.DroppedPairs[pair.pair] = {
-        ...pair,
-        dropCode
-      }
+    const dropPair = (pair: DroppedPair): boolean => {
+      logger.droppedPair(pair)
+      // this.DroppedPairs[pair.pair] = { ...pair, dropCode }
       return false
     }
 
     this.negotiationTable = new NegotiationTable({
       dropPair,
       addToFinalPairs: (pair: FinalPair) => {
-        pair.feeDollar = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
-        console.log(pair.baseAmount.toString())
-        Binance.newOrderTest(this.user, pair.feeDollar, {
-          symbol: pair.pair,
-          side: pair.side,
-          quantity: pair.baseAmount.toString(),
-          type: 'MARKET'
-        }).then(result => {
-          pair.success = !!result
-          this.finalPairs.push(pair)
-        })
+        pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
+        pair.feeDollar = pair.dollarValue * 0.0075
+        this.trades.push(Binance.newOrder(this.user, pair.feeDollar, {
+            symbol: pair.pair,
+            side: pair.side,
+            quantity: pair.baseAmount.toString(),
+            type: 'MARKET'
+          }).then(result => {
+            pair.success = !!result
+            logger.addTrade(pair)
+            return pair
+          })
+        )
       }
     })
 
@@ -153,34 +168,38 @@ class TradeBot {
     const dollarSymbolPie: { [symbol: string]: number } = this.getNormalizedSymbols()
     const dollarDifference: { [symbol: string]: number } = this.getNormalizedSymbols()
 
-    const diffPerc = {}
+    const balancePerc = this.getNormalizedSymbols()
+    const diffPerc = this.getNormalizedSymbols()
+    const symPieBtc = this.getNormalizedSymbols()
 
     await analysisPromise
 
     for (let i = 0, len = this.symbols.length; i < len; i++) {
       const symbol = this.symbols[i]
-      diffPerc[symbol] = this.analysis.symbolPie[symbol] - (this.balanceBtc[symbol] / this.balanceTotalBtc)
-      this.differenceBtc[symbol] += diffPerc[symbol] * this.balanceTotalBtc
+      symPieBtc[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc
+      balancePerc[symbol] += (this.balanceBtc[symbol] / this.balanceTotalBtc)
+      diffPerc[symbol] += balancePerc[symbol] - this.analysis.symbolPie[symbol]
+      this.differenceBtc[symbol] += this.balanceBtc[symbol] - symPieBtc[symbol]
       this.difference[symbol] += this.differenceBtc[symbol] / this.prices[`${symbol}BTC`]
       dollarSymbolPie[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc * this.prices['BTCUSDT']
-      dollarDifference[symbol] += this.differenceBtc[symbol] * this.prices['BTCUSDT']
+      dollarDifference[symbol] += dollarBalance[symbol] - dollarSymbolPie[symbol]
 
-      if (this.differenceBtc[symbol] < 0) {
+      if (this.differenceBtc[symbol] > 0) {
         providerSymbols.push(symbol)
         this.negotiationTable.addProvider({
           providerSymbol: symbol,
-          spendableBtc: -this.differenceBtc[symbol],
-          spendable: -this.difference[symbol],
-          totalSpendableBtc: -this.balanceBtc[symbol],
-          totalSpendable: -this.balance[symbol],
+          spendableBtc: this.differenceBtc[symbol],
+          spendable: this.difference[symbol],
+          totalSpendableBtc: this.balanceBtc[symbol],
+          totalSpendable: this.balance[symbol],
           logger: symbol
         })
-      } else if (this.differenceBtc[symbol] > 0) {
+      } else if (this.differenceBtc[symbol] < 0) {
         collectorSymbols.push(symbol)
         this.negotiationTable.addCollector({
           collectorSymbol: symbol,
-          demandBtc: this.differenceBtc[symbol],
-          demand: this.difference[symbol],
+          demandBtc: -this.differenceBtc[symbol],
+          demand: -this.difference[symbol],
           logger: symbol
         })
       }
@@ -189,88 +208,90 @@ class TradeBot {
     logger.addSymbolPie({ name: '$ SymbolPie', values: dollarSymbolPie })
     logger.addSymbolPie({ name: '$ Diff', values: dollarDifference })
     logger.symbolPie()
+    logger.startDroppedPairs()
 
     for (let i = 0, len = collectorSymbols.length; i < len; i++) {
       const collectorSymbol = collectorSymbols[i]
       for (let j = 0, jen = this.analysis.pairsPerSymbol[collectorSymbol].length; j < jen; j++) {
         const pair = this.analysis.pairsPerSymbol[collectorSymbol][j]
         const providerSymbol = pair.baseAsset === collectorSymbol ? pair.quoteAsset : pair.baseAsset
-        if (providerSymbols.includes(providerSymbol)) {
-          const candidatePair: CandidatePair = this.analysis.assignedPair[pair.symbol]
-          const price = Binance.getAvgPrice(pair.symbol)
-          if (candidatePair.collector !== collectorSymbol) {
-            dropPair(candidatePair, 1)
+        if (!providerSymbols.includes(providerSymbol)) continue
+        const candidatePair: CandidatePair = {
+          pair: pair.symbol,
+          side: pair.baseAsset === collectorSymbol ? 'BUY' : 'SELL',
+          provider: providerSymbol,
+          collector: collectorSymbol,
+          score: this.analysis.techPairScore[pair.symbol]
+        }
+        const assignedPair: AssignedPair = this.analysis.assignedPair[pair.symbol]
+        const price = Binance.getAvgPrice(pair.symbol)
+        if (assignedPair.collector !== collectorSymbol) {
+          dropPair({ ...candidatePair, dropCode: 1 } as DroppedPair)
+          continue
+        }
+        candidatePair.collectorScore = this.analysis.marketSymbolScore[collectorSymbol]
+        const { minQty: minBase, stepSize }: any = pair.filters.filter(fil => fil.filterType === 'LOT_SIZE')[0]
+        const { minNotional: minQuote }: any = pair.filters.filter(fil => fil.filterType === 'MIN_NOTIONAL')[0]
+        candidatePair.minBase = parseFloat(minBase)
+        candidatePair.minQuote = parseFloat(minQuote)
+        const collectorAmount = this.negotiationTable.collectorAmount[collectorSymbol]
+        const providerFunds = this.negotiationTable.providerFunds[providerSymbol]
+        if (candidatePair.side === 'BUY') {
+          if (collectorAmount < minBase) {
+            dropPair({ ...candidatePair, collectorAmount, dropCode: 2 } as DroppedPair)
             continue
           }
-          candidatePair.collectorScore = this.analysis.marketSymbolScore[collectorSymbol]
-          const { minQty: minBase }: any = pair.filters.filter(fil => fil.filterType === 'LOT_SIZE')[0]
-          const { minNotional: minQuote }: any = pair.filters.filter(fil => fil.filterType === 'MIN_NOTIONAL')[0]
-          candidatePair.minBase = minBase
-          candidatePair.minQuote = minQuote
-          const collectorAmount = this.negotiationTable.collectorAmount[collectorSymbol]
-          const providerFunds = this.negotiationTable.providerFunds[providerSymbol]
-          if (candidatePair.side === 'BUY') {
-            if (collectorAmount < minBase) {
-              dropPair(candidatePair, 2)
-              continue
-            }
-            if (providerFunds < minQuote) {
-              dropPair(candidatePair, 3)
-              continue
-            }
-          } else {
-            if (providerFunds < minBase) {
-              dropPair(candidatePair, 4)
-              continue
-            }
-            if (collectorAmount < minQuote) {
-              dropPair(candidatePair, 5)
-              continue
-            }
+          if (providerFunds < minQuote) {
+            dropPair({ ...candidatePair, providerFunds, dropCode: 3 } as DroppedPair)
+            continue
           }
-          candidatePair.baseSymbol = pair.baseAsset
-          candidatePair.price = await price
-          this.negotiationTable.addCandidatePair(candidatePair as ParticipantPair)
-          this.prices[candidatePair.pair] = candidatePair.price
+        } else {
+          if (providerFunds < minBase) {
+            dropPair({ ...candidatePair, providerFunds, dropCode: 4 } as DroppedPair)
+            continue
+          }
+          if (collectorAmount < minQuote) {
+            dropPair({ ...candidatePair, collectorAmount, dropCode: 5 } as DroppedPair)
+            continue
+          }
         }
+        candidatePair.baseSymbol = pair.baseAsset
+        candidatePair.stepSize = parseFloat(stepSize)
+        candidatePair.price = await price
+        this.negotiationTable.addCandidatePair(candidatePair as ParticipantPair)
+        this.prices[candidatePair.pair] = candidatePair.price
       }
     }
 
-    await this.negotiationTable.run()
+    this.negotiationTable.run()
+    await Promise.all(this.trades)
 
-    if (this.finalPairs.length > 0) {
+    if (logger.hasTrades()) logger.trades()
 
-      // await Promise.all(this.finalPairs.map((order, idx) => {
-      //   return new Promise(resolve => setTimeout(() => {
-      //     resolve(Binance.newOrder(this.user, order.feeDollars, order.order))
-      //   }, Math.floor((idx - 1) / 10) * 1000))
-      //   .then((result: SavedOrder) => {
-      //     this.orderResult.push(result)
-      //   })
-      // }))
+    const newDollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
+    let newTotalBtc = 0
 
-      // await Promise.all(this.finalPairs.map((order, idx) => {
-      //   return new Promise(resolve => setTimeout(() => {
-      //     resolve(Binance.newOrderTest(this.user, order.feeDollars, order.order))
-      //   }, Math.floor((idx - 1) / 10) * 1000))
-      //   .then((result: TestOrderResult) => {
-      //     this.orderResultTest.push(result)
-      //   })
-      // }))
+    await Binance.getAccountBalances(this.user.id).then(balances => {
+      for (let i = 0, len = balances.length; i < len; i++) {
+        const balance = balances[i]
+        const amount = parseFloat(balance.free)
+        if (amount > 0 && this.symbols.includes(balance.asset)) {
+          const amountBtc = amount * this.prices[`${balance.asset}BTC`]
+          newTotalBtc += amountBtc
+          newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
+        }
+      }
+    })
 
-      const newDollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
+    logger.endLog({
+      oldDollarBalance: dollarBalance,
+      newDollarBalance: newDollarBalance,
+      btc: newTotalBtc,
+      dollar: newTotalBtc * this.prices['BTCUSDT'],
+      dollarDiff: (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT']),
+      tradeTime: Date.now() - start
+    })
 
-      await Binance.getAccountBalances(this.user.id).then(balances => {
-        balances.forEach(balance => {
-          const amount = parseFloat(balance.free)
-          if (amount > 0 && this.symbols.includes(balance.asset)) {
-            const amountBtc = amount * this.prices[`${balance.asset}BTC`]
-            newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
-          }
-        })
-      })
-
-    }
   }
 
 }

@@ -64,6 +64,7 @@ class Analysis implements IAnalysis {
 
   public marketQuoteScore: { [quoteSymbol: string]: MarketAnalysisResult } = {}
   public marketSymbolScore: { [symbol: string]: number } = {}
+  public marketPairCollectorScore: { [pair: string]: number } = {}
 
   public assignedPair: { [pair: string]: AssignedPair } = {}
 
@@ -124,7 +125,6 @@ class Analysis implements IAnalysis {
 
   public async run(logger: Logger): Promise<void> {
     const start = Date.now()
-
     this.newsScore = new AnalysisNews({ symbols: this.symbols })
     const newsAnalysisPromise = this.newsScore.run(logger)
 
@@ -138,10 +138,10 @@ class Analysis implements IAnalysis {
         techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
         .then((candles: StockData) => {
           this.techPairScore[this.pairs[i]] += (
-              (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
-              + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
-              + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
-            ) * this.intervalWeights[j]
+            (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
+            + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
+            + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
+          ) * this.intervalWeights[j]
         }))
       }
     }
@@ -163,7 +163,6 @@ class Analysis implements IAnalysis {
           ? [acc[0] - quoteScore / src.length, acc[1]]
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
-
 
       const quoteMultiplier = Math.pow(quoteScore + 1, quoteScore + 2)
       this.marketQuoteScore[quoteSymbol] = {
@@ -206,22 +205,23 @@ class Analysis implements IAnalysis {
       const altDivider = (marketQuoteSymbol === 'ALTS' ? qen : 1)
       this.techSymbolScore[collector] += Math.abs(baseScore) / this.pairsPerSymbol[collector].length
       this.marketSymbolScore[collector] += (this.techSymbolScore[collector] * marketMultiplier) / altDivider
+      this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] * marketMultiplier) / altDivider
 
       logger.addPairAnalysis({
         pair: pair.symbol,
         side,
         score: this.techPairScore[pair.symbol],
-        symbolScore: this.marketSymbolScore[collector]
+        symbolScore: this.marketPairCollectorScore[pair.symbol]
       })
-    }
 
+    }
     logger.pairAnalysis()
 
     await newsAnalysisPromise
     logger.newsPosts()
 
     const sen = this.symbols.length
-    for (let i = 0; i < sen; i ++) {
+    for (let i = 0; i < sen; i++) {
       const symbol = this.symbols[i]
       this.symbolTotals[symbol] += this.marketQuoteScore[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
@@ -230,10 +230,8 @@ class Analysis implements IAnalysis {
     }
 
     /** this.symbolPie = */
-    for (let i = 0; i < sen; i ++) this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
-
-
-    console.log(`analysis time: ${Date.now() - start}ms`)
+    for (let i = 0; i < sen; i++) this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
+    logger.addTime({ item: 'analysis', time: Date.now() - start })
   }
 }
 

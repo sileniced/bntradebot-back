@@ -141,8 +141,7 @@ class BinanceApi {
         executedQty: parseFloat(result.executedQty),
         cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty),
         feeDollars
-      })
-      .save()
+      }).save()
     )
     .catch(error => {
       console.error(error)

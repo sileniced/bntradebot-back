@@ -77,6 +77,7 @@ class AnalysisNews implements IAnalysisNews {
   }
 
   public run(logger: Logger) {
+    const start = Date.now()
     return Promise.all(this.pages.map((page: number) => {
       return new Promise(resolve => setTimeout(() => {
         resolve(this.cryptoPanicApi(this.symbols, page)
@@ -101,7 +102,7 @@ class AnalysisNews implements IAnalysisNews {
       }, Math.floor((page - 1) / 5) * 1000))
     }))
     .then(() => {
-      for (let i = 0, len = this.symbols.length; i< len; i++) {
+      for (let i = 0, len = this.symbols.length; i < len; i++) {
         const symbol = this.symbols[1]
         this.symbolAnalysisTotals[symbol].weightedVotes.forEach((value, idx, src) => {
           const score = {
@@ -112,6 +113,7 @@ class AnalysisNews implements IAnalysisNews {
           this.symbolAnalysis[symbol] += (score.post + score.vote + score.ages) / src.length
         })
       }
+      logger.addTime({ item: 'news', time: Date.now() - start })
     })
   }
 }

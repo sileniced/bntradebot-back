@@ -1,7 +1,6 @@
-import { CandidatePair, FinalPair } from './TradeBot'
-import { AssignedPair } from '../Analysis'
+import { CandidatePair, DroppedPair, FinalPair } from './TradeBot'
 
-export interface ParticipantPair extends AssignedPair {
+export interface ParticipantPair extends CandidatePair {
   collectorScore: number,
   minBase: number,
   minQuote: number,
@@ -30,7 +29,7 @@ export interface Collector {
 }
 
 export interface NegotiationTableInput {
-  dropPair: (candidatePair: CandidatePair, dropCode: number) => boolean
+  dropPair: (candidatePair: DroppedPair) => boolean
   addToFinalPairs: (pair: FinalPair) => void
 }
 
@@ -49,7 +48,7 @@ class NegotiationTable implements INegotiationTable {
 
   private candidatePairs: ParticipantPair[] = []
 
-  private readonly dropPair: (pair: ParticipantPair, dropCode: number) => boolean
+  private readonly dropPair: (pair: DroppedPair) => boolean
   private readonly addToFinalPairs: (pair: FinalPair) => void
 
   public providerFundsBtc: { [providerSymbol: string]: number } = {}
@@ -87,14 +86,15 @@ class NegotiationTable implements INegotiationTable {
       const pair = this.candidatePairs[i]
 
       pair.providerFundsBtc = this.providerFundsBtc[pair.provider]
+      pair.collectorAmountBtc = this.collectorAmountBtc[pair.collector]
+      
       if (pair.providerFundsBtc <= 0) {
-        this.dropPair(pair, 6)
+        this.dropPair({ ...pair, dropCode: 6 } as DroppedPair)
         continue
       }
-
-      pair.collectorAmountBtc = this.collectorAmountBtc[pair.collector]
+      
       if (pair.collectorAmountBtc <= 0) {
-        this.dropPair(pair, 7)
+        this.dropPair({ ...pair, dropCode: 7 } as DroppedPair)
         continue
       }
 
@@ -105,14 +105,14 @@ class NegotiationTable implements INegotiationTable {
           // collector
           pair.baseAmount = parseStepSize(this.collectorAmount[pair.collector], pair.stepSize)
           if (pair.baseAmount < pair.minBase) {
-            this.dropPair(pair, 8)
+            this.dropPair({ ...pair, dropCode: 8 } as DroppedPair)
             continue
           }
 
           // provider
           pair.quoteAmount = pair.baseAmount * pair.price
           if (pair.quoteAmount < pair.minQuote) {
-            this.dropPair(pair, 9)
+            this.dropPair({ ...pair, dropCode: 9 } as DroppedPair)
             continue
           }
 
@@ -123,14 +123,14 @@ class NegotiationTable implements INegotiationTable {
           // collector
           pair.quoteAmount = this.collectorAmount[pair.collector]
           if (pair.quoteAmount < pair.minQuote) {
-            this.dropPair(pair, 10)
+            this.dropPair({ ...pair, dropCode: 10 } as DroppedPair)
             continue
           }
 
           // provider
           pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize)
           if (pair.baseAmount < pair.minBase) {
-            this.dropPair(pair, 11)
+            this.dropPair({ ...pair, dropCode: 11 } as DroppedPair)
             continue
           }
 
@@ -148,14 +148,14 @@ class NegotiationTable implements INegotiationTable {
           // provider
           pair.quoteAmount = this.providerFunds[pair.provider]
           if (pair.quoteAmount < pair.minQuote) {
-            this.dropPair(pair, 9)
+            this.dropPair({ ...pair, dropCode: 9 } as DroppedPair)
             continue
           }
 
           // collector
           pair.baseAmount = parseStepSize(pair.quoteAmount / pair.price, pair.stepSize)
           if (pair.baseAmount < pair.minBase) {
-            this.dropPair(pair, 8)
+            this.dropPair({ ...pair, dropCode: 8 } as DroppedPair)
             continue
           }
 
@@ -166,14 +166,14 @@ class NegotiationTable implements INegotiationTable {
           // provider
           pair.baseAmount = parseStepSize(this.providerFunds[pair.provider], pair.stepSize)
           if (pair.baseAmount < pair.minBase) {
-            this.dropPair(pair, 11)
+            this.dropPair({ ...pair, dropCode: 11 } as DroppedPair)
             continue
           }
 
           // collector
           pair.quoteAmount = pair.baseAmount * pair.price
           if (pair.quoteAmount < pair.minQuote) {
-            this.dropPair(pair, 10)
+            this.dropPair({ ...pair, dropCode: 10 } as DroppedPair)
             continue
           }
 
@@ -186,7 +186,7 @@ class NegotiationTable implements INegotiationTable {
         this.providerFunds[pair.provider] = 0
 
       } else {
-        this.dropPair(pair, 12)
+        this.dropPair({ ...pair, dropCode: 12 } as DroppedPair)
         continue
       }
 
