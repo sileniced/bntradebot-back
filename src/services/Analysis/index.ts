@@ -143,16 +143,6 @@ class Analysis implements IAnalysis {
       for (let j = 0; j < ien; j++) {
         techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
         .then((candles: StockData) => {
-          if (this.pairs[i].includes('USDT') && this.intervalList[j] === '1d') {
-            console.table({
-              pair: this.pairs[i],
-              interval: this.intervalList[j],
-              candle: CandleStickAnalysis(candles)._score,
-              osc: Oscillators(candles)._score,
-              ma: MovingAverages(candles)._score,
-              pc: PriceChangeAnalysis(candles)
-            })
-          }
           this.techPairScore[this.pairs[i]] += (
             (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
             + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
