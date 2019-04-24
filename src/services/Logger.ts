@@ -196,7 +196,7 @@ class Logger implements ILogger {
     dollarDiff: number,
     tradeTime: number,
   }) => {
-
+    console.log('')
     logRow(this.symbolOrder.map((symbol) => symbol), 'Symbol')
     logRow(this.symbolOrder.map(symbol => oldDollarBalance[symbol]), 'old $')
     logRow(this.symbolOrder.map(symbol => newDollarBalance[symbol]), 'new $')
