@@ -51,6 +51,7 @@ class Logger implements ILogger {
       totalBalance.btcPrice
     ], ' ')
     console.log('')
+    console.log('')
   }
 
   private _marketAnalysis: MarketAnalysisResult[] = []
@@ -93,10 +94,15 @@ class Logger implements ILogger {
 
   public newsPosts = (): void => {
     console.log(`NEWS ANALYSIS`)
-    logRow(['TOP 5', 'WORST 5'], '', 110)
+    logRow(['TOP 5', 'WORST 5'], '', 100)
     const data = this._newsPosts.sort((a, b) => b.score - a.score)
     for (let i = 0; i < 5; i++) {
-      logRow([data[i].title, data[(data.length - 1) - i].title], '', 90)
+      const best = data[i].title
+      const worst = data[(data.length - 1) - i].title
+      logRow([
+        best.length > 99 ? best.slice(0, 95) + '...' : best,
+        worst.length > 99 ? best.slice(0, 95) + '...' : best
+      ], '', 100)
     }
     console.log('')
   }
@@ -180,7 +186,6 @@ class Logger implements ILogger {
       const trade = this._trades[i]
       logRow([trade.pair, trade.side, trade.price, trade.collector, trade.baseAmount, trade.dollarValue, trade.feeDollar, trade.success ? 'Success' : ''])
     }
-    console.log('')
   }
 
   private _time: { [item: string]: number } = {}
