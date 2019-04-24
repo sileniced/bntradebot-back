@@ -15,7 +15,7 @@ function parseValue(value: any) {
 
 }
 
-const logRow = (data: any[], title: string = '', len: number = 15): void => {
+const logRow = (data: any[], title: string = '', len: number = 20): void => {
   console.log(data.reduce((acc, value, idx) => {
     const sid = title === '' ? idx : idx + 1
     const cnt = ((sid) * len) - acc.length
@@ -93,7 +93,7 @@ class Logger implements ILogger {
 
   public newsPosts = (): void => {
     console.log(`NEWS ANALYSIS`)
-    logRow(['TOP 5', 'WORST 5'], '', 90)
+    logRow(['TOP 5', 'WORST 5'], '', 110)
     const data = this._newsPosts.sort((a, b) => b.score - a.score)
     for (let i = 0; i < 5; i++) {
       logRow([data[i].title, data[(data.length - 1) - i].title], '', 90)
@@ -205,8 +205,8 @@ class Logger implements ILogger {
       return cal !== 0 ? cal : ' '
     }), 'diff $')
     console.log('')
-    logRow(['BTC', 'USDT', 'USDT Diff', 'run time', 'analysis time', 'news analysis time'])
-    logRow([btc, dollar, dollarDiff, `${tradeTime}ms`, `${this._time['analysis']}ms`, `${this._time['news']}ms`])
+    logRow(['BTC', 'USDT', 'USDT Diff', 'run time', 'analysis time', 'news analysis time'], ' ')
+    logRow([btc, dollar, dollarDiff, `${tradeTime}ms`, `${this._time['analysis']}ms`, `${this._time['news']}ms`], ' ')
     console.log('')
     logRow(Array(40).fill(' _ '), '', 3)
   }
