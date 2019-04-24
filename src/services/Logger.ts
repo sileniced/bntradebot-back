@@ -202,7 +202,7 @@ class Logger implements ILogger {
     logRow(this.symbolOrder.map(symbol => newDollarBalance[symbol]), 'new $')
     logRow(this.symbolOrder.map(symbol => {
       const cal = newDollarBalance[symbol] - oldDollarBalance[symbol]
-      return cal !== 0 ? cal : ' '
+      return Math.abs(cal) > 0.0001 ? cal : ' '
     }), 'diff $')
     console.log('')
     logRow(['BTC', 'USDT', 'USDT Diff', 'run time', 'analysis time', 'news analysis time'], ' ')
