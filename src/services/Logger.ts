@@ -201,7 +201,7 @@ class Logger implements ILogger {
     logRow(this.symbolOrder.map(symbol => oldDollarBalance[symbol]), 'old $')
     logRow(this.symbolOrder.map(symbol => newDollarBalance[symbol]), 'new $')
     logRow(this.symbolOrder.map(symbol => {
-      const cal = oldDollarBalance[symbol] - newDollarBalance[symbol]
+      const cal = newDollarBalance[symbol] - oldDollarBalance[symbol]
       return cal !== 0 ? cal : ' '
     }), 'diff $')
     console.log('')
