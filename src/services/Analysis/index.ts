@@ -51,7 +51,19 @@ class Analysis implements IAnalysis {
   // todo: user custom (list and weights)
   private readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
-  private readonly intervalWeights: number[] = [0.025236593, 0.075709779, 0.126182965, 0.378548896, 0.189274448, 0.094637224, 0.047318612, 0.023659306, 0.015772871, 0.011829653, 0.007886435, 0.003943218]
+  private readonly intervalWeights: number[] = [0.005434783,
+    0.016304348,
+    0.027173913,
+    0.081521739,
+    0.163043478,
+    0.326086957,
+    0.163043478,
+    0.081521739,
+    0.054347826,
+    0.04076087,
+    0.027173913,
+    0.013586957
+  ]
   private readonly techAnalysisWeights = {
     candlesticks: 0.14,
     oscillators: 0.29,

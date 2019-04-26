@@ -22,25 +22,35 @@ class TradeBotEntity extends BaseEntity {
   public pairs: string[]
 
   @Column('simple-array')
-  private _pricesPairs: number[]
+  private _pricesPairs: string[]
 
   @Column('simple-array')
-  public BalanceSymbols: number[]
+  private _balanceSymbols: string[]
 
   @Column('simple-array')
   public quoteSymbols: string[]
 
-  get pricesPairs(): { [p: string]: number } {
-    return this.symbols.forEach(symbol => {
-      
-    })
+  get pricesPairs(): { [pair: string]: number } {
+    return this.pairs.reduce((acc, pair, idx) => {
+      acc[pair] = parseFloat(this._pricesPairs[idx])
+      return acc
+    }, {})
   }
 
-  set pricesPairs(value: { [p: string]: number }) {
-    this._pricesPairs = value
+  set pricesPairs(value: { [pair: string]: number }) {
+    this._pricesPairs = this.pairs.map(pair => value[pair].toString())
   }
 
-  private _balanceSymbols: { [symbol: string]: number }
+  get balanceSymbols(): { [symbol: string]: number } {
+    return this.symbols.reduce((acc, symbol, idx) => {
+      acc[symbol] = parseFloat(this._balanceSymbols[idx])
+      return acc
+    }, {})
+  }
+
+  set balanceSymbols(value: { [symbol: string]: number }) {
+    this._balanceSymbols = this.symbols.map(symbol => value[symbol].toString())
+  }
 }
 
 export default TradeBotEntity

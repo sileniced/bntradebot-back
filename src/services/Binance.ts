@@ -51,7 +51,7 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: 1000 * 60 * 15
+    globalTradeInterval: 1000 * 60 * 10
   }
 
   private activeTradeBotUserIds: number[] = []
