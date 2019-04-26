@@ -4,6 +4,7 @@ import { OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../Logger'
+import TradeBotEntity from '../../entities/TradeBotEntity'
 
 export interface FinalPair extends ParticipantPair {
   score: number,
@@ -46,6 +47,8 @@ export interface DroppedPair {
 
 class TradeBot {
 
+  private entity: TradeBotEntity
+
   // todo: get from user database ('USDT' required)
   readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO']
 
@@ -55,14 +58,9 @@ class TradeBot {
 
   private prices: { [pair: string]: number } = { ['BTCBTC']: 1 }
 
-  private balance: { [symbol: string]: number } = {}
-  private balanceBtc: { [symbol: string]: number } = {}
   private balanceTotalBtc: number = 0
 
   private analysis: Analysis
-
-  private differenceBtc: { [symbol: string]: number } = {}
-  private difference: { [symbol: string]: number } = {}
 
   // private DroppedPairs: { [pair: string]: DroppedPair } = {}
 
@@ -77,11 +75,9 @@ class TradeBot {
   constructor(user: User) {
 
     this.user = user
+    this.entity = new TradeBotEntity()
+    this.entity.symbols = this.symbols
 
-    this.balance = this.getNormalizedSymbols()
-    this.balanceBtc = this.getNormalizedSymbols()
-    this.differenceBtc = this.getNormalizedSymbols()
-    this.difference = this.getNormalizedSymbols()
   }
 
   protected readonly getNormalizedSymbols = (): { [symbol: string]: number } => {
@@ -102,12 +98,17 @@ class TradeBot {
 
     await Binance.getPairs().then(pairInfo => {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
+      this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
     })
 
     this.analysis = new Analysis({ pairsInfo: this.pairsInfo, getNormalizedSymbols: this.getNormalizedSymbols })
     const analysisPromise = this.analysis.run(logger)
 
+    const balance = this.getNormalizedSymbols()
+    const balanceBtc = this.getNormalizedSymbols()
     const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
+    const differenceBtc = this.getNormalizedSymbols()
+    const difference = this.getNormalizedSymbols()
 
     await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
     .then(([btcUsdtPrice, pricesBtc, balances]) => {
@@ -121,12 +122,15 @@ class TradeBot {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
         if (amount > 0 && this.symbols.includes(balance.asset)) {
-          this.balance[balance.asset] += amount
-          this.balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
-          dollarBalance[balance.asset] += this.balanceBtc[balance.asset] * this.prices['BTCUSDT']
-          this.balanceTotalBtc += this.balanceBtc[balance.asset]
+          balance[balance.asset] += amount
+          balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
+          dollarBalance[balance.asset] += balanceBtc[balance.asset] * this.prices['BTCUSDT']
+          this.balanceTotalBtc += balanceBtc[balance.asset]
         }
       }
+
+      this.entity.pricesPairs = this.prices
+      this.entity.balanceSymbols = balance
 
     })
 
@@ -143,23 +147,25 @@ class TradeBot {
       return false
     }
 
+    const addToFinalPairs = (pair: FinalPair) => {
+      pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
+      pair.feeDollar = pair.dollarValue * 0.0075
+      this.trades.push(Binance.newOrder(this.user, pair.feeDollar, {
+          symbol: pair.pair,
+          side: pair.side,
+          quantity: pair.baseAmount.toString(),
+          type: 'MARKET'
+        }).then(result => {
+          pair.success = !!result.orderId
+          logger.addTrade(pair)
+          return pair
+        })
+      )
+    }
+
     this.negotiationTable = new NegotiationTable({
       dropPair,
-      addToFinalPairs: (pair: FinalPair) => {
-        pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
-        pair.feeDollar = pair.dollarValue * 0.0075
-        this.trades.push(Binance.newOrder(this.user, pair.feeDollar, {
-            symbol: pair.pair,
-            side: pair.side,
-            quantity: pair.baseAmount.toString(),
-            type: 'MARKET'
-          }).then(result => {
-            pair.success = !!result.orderId
-            logger.addTrade(pair)
-            return pair
-          })
-        )
-      }
+      addToFinalPairs
     })
 
     const collectorSymbols: string[] = []
@@ -174,32 +180,40 @@ class TradeBot {
 
     await analysisPromise
 
+    this.entity.symbolPie = this.analysis.symbolPie
+    this.entity.analysisPair = this.analysis.techPairScore
+    this.entity.marketSymbols = this.analysis.marketSymbols
+    this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
+      acc[market] = this.analysis.marketScore[market].score
+      return acc
+    }, {})
+
     for (let i = 0, len = this.symbols.length; i < len; i++) {
       const symbol = this.symbols[i]
       symPieBtc[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc
-      balancePerc[symbol] += (this.balanceBtc[symbol] / this.balanceTotalBtc)
+      balancePerc[symbol] += (balanceBtc[symbol] / this.balanceTotalBtc)
       diffPerc[symbol] += balancePerc[symbol] - this.analysis.symbolPie[symbol]
-      this.differenceBtc[symbol] += this.balanceBtc[symbol] - symPieBtc[symbol]
-      this.difference[symbol] += this.differenceBtc[symbol] / this.prices[`${symbol}BTC`]
+      differenceBtc[symbol] += balanceBtc[symbol] - symPieBtc[symbol]
+      difference[symbol] += differenceBtc[symbol] / this.prices[`${symbol}BTC`]
       dollarSymbolPie[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc * this.prices['BTCUSDT']
       dollarDifference[symbol] += dollarBalance[symbol] - dollarSymbolPie[symbol]
 
-      if (this.differenceBtc[symbol] > 0) {
+      if (differenceBtc[symbol] > 0) {
         providerSymbols.push(symbol)
         this.negotiationTable.addProvider({
           providerSymbol: symbol,
-          spendableBtc: this.differenceBtc[symbol],
-          spendable: this.difference[symbol],
-          totalSpendableBtc: this.balanceBtc[symbol],
-          totalSpendable: this.balance[symbol],
+          spendableBtc: differenceBtc[symbol],
+          spendable: difference[symbol],
+          totalSpendableBtc: balanceBtc[symbol],
+          totalSpendable: balance[symbol],
           logger: symbol
         })
-      } else if (this.differenceBtc[symbol] < 0) {
+      } else if (differenceBtc[symbol] < 0) {
         collectorSymbols.push(symbol)
         this.negotiationTable.addCollector({
           collectorSymbol: symbol,
-          demandBtc: -this.differenceBtc[symbol],
-          demand: -this.difference[symbol],
+          demandBtc: -differenceBtc[symbol],
+          demand: -difference[symbol],
           logger: symbol
         })
       }
@@ -271,6 +285,7 @@ class TradeBot {
 
     if (logger.hasTrades()) logger.trades()
 
+    const newBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     const newDollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     let newTotalBtc = 0
 
@@ -285,6 +300,8 @@ class TradeBot {
         }
       }
     })
+
+    this.entity.balancePostTradeSymbols = newBalance
 
     logger.endLog({
       oldDollarBalance: dollarBalance,

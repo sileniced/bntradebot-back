@@ -34,7 +34,7 @@ export interface IAnalysis {
   techPairScore: { [pair: string]: number }
   techSymbolScore: { [symbol: string]: number }
 
-  marketQuoteScore: { [quoteSymbol: string]: MarketAnalysisResult }
+  marketScore: { [quoteSymbol: string]: MarketAnalysisResult }
   marketSymbolScore: { [symbol: string]: number }
 
   assignedPair: { [pair: string]: AssignedPair }
@@ -51,19 +51,7 @@ class Analysis implements IAnalysis {
   // todo: user custom (list and weights)
   private readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
-  private readonly intervalWeights: number[] = [0.005434783,
-    0.016304348,
-    0.027173913,
-    0.081521739,
-    0.163043478,
-    0.326086957,
-    0.163043478,
-    0.081521739,
-    0.054347826,
-    0.04076087,
-    0.027173913,
-    0.013586957
-  ]
+  private readonly intervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
   private readonly techAnalysisWeights = {
     candlesticks: 0.14,
     oscillators: 0.29,
@@ -74,13 +62,13 @@ class Analysis implements IAnalysis {
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
-  private readonly quoteSymbols: string[] = []
+  public readonly marketSymbols: string[] = []
   public readonly pairsPerSymbol: { [symbol: string]: Symbol[] } = {}
 
   public techPairScore: { [pair: string]: number } = {}
   public techSymbolScore: { [symbol: string]: number } = {}
 
-  public marketQuoteScore: { [quoteSymbol: string]: MarketAnalysisResult } = {}
+  public marketScore: { [quoteSymbol: string]: MarketAnalysisResult } = {}
   public marketSymbolScore: { [symbol: string]: number } = {}
   public marketPairCollectorScore: { [pair: string]: number } = {}
 
@@ -113,7 +101,7 @@ class Analysis implements IAnalysis {
     this.symbolPie = getNormalizedSymbols()
     this.symbolTotals = getNormalizedSymbols()
 
-    this.marketQuoteScore['ALTS'] = {
+    this.marketScore['ALTS'] = {
       quoteSymbol: 'ALTS',
       score: 0,
       multiplier: 0,
@@ -127,7 +115,7 @@ class Analysis implements IAnalysis {
     }, getNormalizedSymbols()))
 
     quoteSymbols.forEach(([quoteSymbol, count]) => {
-      if (count > pairsInfo.length / quoteSymbols.length) this.quoteSymbols.push(quoteSymbol)
+      if (count > pairsInfo.length / quoteSymbols.length) this.marketSymbols.push(quoteSymbol)
     })
 
     this.pairsPerSymbol = this.symbols.reduce((acc, symbol) => {
@@ -169,10 +157,10 @@ class Analysis implements IAnalysis {
 
     this.apiCalls = techAnalysisPromises.length
 
-    /** this.marketQuoteScore[quoteSymbol | altsMarket] = */
-    const qen = this.quoteSymbols.length
+    /** this.marketScore[quoteSymbol | altsMarket] = */
+    const qen = this.marketSymbols.length
     for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.quoteSymbols[i]
+      const quoteSymbol = this.marketSymbols[i]
 
       const [baseScore, quoteScore] = this.pairsPerSymbol[quoteSymbol]
       .filter(pair => pair.quoteAsset === quoteSymbol)
@@ -183,25 +171,32 @@ class Analysis implements IAnalysis {
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
 
-      /* todo: HIER MOET NOG IETS: de quote symbols need to battle it out */
+      /*
+      todo: HIER MOET NOG IETS: de quote symbols need to battle it out
+
+      Als market1 het sterker doet dan market2,
+      en een symbol wordt vergeleken met market2,
+      moet het eerst kijken naar market1.
+       */
+
 
       const quoteMultiplier = Math.sqrt(quoteScore)
       const baseMultiplier = Math.sqrt(baseScore)
 
-      this.marketQuoteScore[quoteSymbol] = {
+      this.marketScore[quoteSymbol] = {
         quoteSymbol,
         score: quoteScore,
         multiplier: quoteMultiplier,
         poweredScore: quoteScore + quoteMultiplier
       }
-      logger.addMarketAnalysis(this.marketQuoteScore[quoteSymbol])
+      logger.addMarketAnalysis(this.marketScore[quoteSymbol])
 
-      this.marketQuoteScore['ALTS'].score += baseScore / qen
-      this.marketQuoteScore['ALTS'].multiplier += baseMultiplier / qen
-      this.marketQuoteScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
+      this.marketScore['ALTS'].score += baseScore / qen
+      this.marketScore['ALTS'].multiplier += baseMultiplier / qen
+      this.marketScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
     }
 
-    logger.addMarketAnalysis(this.marketQuoteScore['ALTS'])
+    logger.addMarketAnalysis(this.marketScore['ALTS'])
     logger.marketAnalysis()
 
     /** this.techSymbolScore[symbol] = */
@@ -222,8 +217,8 @@ class Analysis implements IAnalysis {
         collector: pair.quoteAsset
       }
       const collector = this.assignedPair[pair.symbol].collector
-      const marketQuoteSymbol = this.quoteSymbols.includes(collector) ? collector : 'ALTS'
-      const poweredScore = this.marketQuoteScore[marketQuoteSymbol].poweredScore
+      const marketQuoteSymbol = this.marketSymbols.includes(collector) ? collector : 'ALTS'
+      const poweredScore = this.marketScore[marketQuoteSymbol].poweredScore
       const altDivider = (marketQuoteSymbol === 'ALTS' ? qen : 1)
       this.techSymbolScore[collector] += Math.abs(baseScore) / this.pairsPerSymbol[collector].length
       this.marketSymbolScore[collector] += (this.techSymbolScore[collector] + poweredScore) / altDivider
@@ -245,7 +240,7 @@ class Analysis implements IAnalysis {
     const sen = this.symbols.length
     for (let i = 0; i < sen; i++) {
       const symbol = this.symbols[i]
-      this.symbolTotals[symbol] += this.marketQuoteScore[this.quoteSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
+      this.symbolTotals[symbol] += this.marketScore[this.marketSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
       this.symbolTotals[symbol] += (this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]) * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
