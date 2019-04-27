@@ -94,7 +94,6 @@ class TradeBot {
     const differenceBtc = this.getNormalizedSymbols()
     const difference = this.getNormalizedSymbols()
 
-
     await Binance.getPairs().then(pairInfo => {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
       this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
@@ -182,7 +181,7 @@ class TradeBot {
     await analysisPromise
 
     this.entity.symbolPie = this.analysis.symbolPie
-    this.entity.analysisPair = this.analysis.techPairScore
+    this.entity.analysisTechPairs = this.analysis.techPairScore
     this.entity.marketSymbols = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
       acc[market] = this.analysis.marketScore[market].score
@@ -313,6 +312,8 @@ class TradeBot {
       dollarDiff: (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT']),
       tradeTime: Date.now() - start
     })
+
+    await this.entity.save()
 
   }
 

@@ -1,6 +1,6 @@
 import { BaseEntity, Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm'
 import User from './User'
-import { DroppedPair } from '../exec/TradeBot/TradeBot'
+import { DroppedPair } from '../app/TradeBot/TradeBot'
 import { parseDropCode } from '../services/utils'
 
 @Entity()
@@ -35,7 +35,7 @@ class TradeBotEntity extends BaseEntity {
   private _balanceSymbols: string[]
 
   @Column('simple-array')
-  private _analysisPair: string[]
+  private _analysisTechPairs: string[]
 
   @Column('simple-array')
   private _analysisMarket: string[]
@@ -82,15 +82,15 @@ class TradeBotEntity extends BaseEntity {
     this._symbolPie = this.symbols.map(symbol => value[symbol].toString())
   }
 
-  get analysisPair(): { [pair: string]: number } {
+  get analysisTechPairs(): { [pair: string]: number } {
     return this.pairs.reduce((acc, pair, idx) => {
-      acc[pair] = parseFloat(this._analysisPair[idx])
+      acc[pair] = parseFloat(this._analysisTechPairs[idx])
       return acc
     }, {})
   }
 
-  set analysisPair(value: { [pair: string]: number }) {
-    this._analysisPair = this.pairs.map(pair => value[pair].toString())
+  set analysisTechPairs(value: { [pair: string]: number }) {
+    this._analysisTechPairs = this.pairs.map(pair => value[pair].toString())
   }
 
   get analysisMarket(): { [market: string]: number } {
@@ -106,31 +106,22 @@ class TradeBotEntity extends BaseEntity {
 
   get droppedPairs(): DroppedPair[] {
     const droppedPairs: DroppedPair[] = []
-    for (let i = 0, len = this.pairs.length * 2; i < len; i + 2) {
+    for (let i = 0, len = this._droppedPairs.length * 3; i < len; i + 3) {
       droppedPairs.push({
         score: 0,
         side: 'BUY',
-        provider: '',
-        collector: '',
-        pair: this.pairs[2 / 2],
-        dropCode: parseInt(this._droppedPairs[i]),
+        provider: 'unfilled',
+        collector: 'unfilled',
+        pair: this.pairs[i],
+        dropCode: parseInt(this._droppedPairs[i + 1]),
         proof: this._droppedPairs[i + 2]
       } as DroppedPair)
     }
     return droppedPairs
   }
 
-  set droppedPairs(value: DroppedPair[]) {
-    const droppedPairs = this.pairs.reduce((acc, pair) => {
-      acc[pair] = {}
-      return acc
-    }, {})
-    value.forEach(pair => {
-      droppedPairs[pair.pair] = pair
-    })
-    this._droppedPairs = this.pairs.map(pair => droppedPairs[pair].pair
-      ? `${droppedPairs[pair].dropCode},${parseDropCode(droppedPairs[pair])[1]}`
-      : ',')
+  set droppedPairs(values: DroppedPair[]) {
+    this._droppedPairs = values.map(value => `${value.pair},${value.dropCode},${parseDropCode(value.dropCode)[1]}`)
   }
 
   get balancePostTradeSymbols(): { [symbol: string]: number } {
