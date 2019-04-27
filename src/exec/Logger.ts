@@ -1,5 +1,6 @@
 import { MarketAnalysisResult } from './Analysis'
 import { DroppedPair, FinalPair } from './TradeBot/TradeBot'
+import { parseDropCode } from '../services/utils'
 
 function parseValue(value: any) {
   switch (typeof value) {
@@ -130,45 +131,7 @@ class Logger implements ILogger {
 
   public droppedPair = (pair: DroppedPair) => {
     const len = 20
-    const data: any[] = [pair.side, pair.provider, pair.collector]
-    switch (pair.dropCode) {
-      case 1:
-        logRow(data.concat(['score=0', pair.score.toFixed(8)]), pair.pair, len)
-        break
-      case 2:
-        logRow(data.concat(['coll<minBase', `${pair.collectorAmount && pair.collectorAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
-        break
-      case 3:
-        logRow(data.concat(['prov<minQuot', `${pair.providerFunds && pair.providerFunds.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
-        break
-      case 4:
-        logRow(data.concat(['prov<minBase', `${pair.providerFunds && pair.providerFunds.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
-        break
-      case 5:
-        logRow(data.concat(['coll<minQuote', `${pair.collectorAmount && pair.collectorAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
-        break
-      case 6:
-        logRow(data.concat(['funds dry', `collect: ${pair.collectorAmountBtc && pair.collectorAmountBtc.toFixed(8)}`]), pair.pair, len)
-        break
-      case 7:
-        logRow(data.concat(['coll done', `provide: ${pair.providerFundsBtc && pair.providerFundsBtc.toFixed(8)}`]), pair.pair, len)
-        break
-      case 8:
-        logRow(data.concat(['coll base<minBase', `${pair.baseAmount && pair.baseAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
-        break
-      case 9:
-        logRow(data.concat(['prov quot<minQuot', `${pair.quoteAmount && pair.quoteAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
-        break
-      case 10:
-        logRow(data.concat(['coll quot<minQuot', `${pair.quoteAmount && pair.quoteAmount.toFixed(8)}<${pair.minQuote}`]), pair.pair, len)
-        break
-      case 11:
-        logRow(data.concat(['prov base<minBase', `${pair.baseAmount && pair.baseAmount.toFixed(8)}<${pair.minBase}`]), pair.pair, len)
-        break
-      case 12:
-        logRow(data.concat(['funds dry & coll done'], pair.pair, len))
-        break
-    }
+    logRow([pair.side, pair.provider, pair.collector, ...parseDropCode(pair)], pair.pair, len)
   }
 
   private _trades: FinalPair[] = []

@@ -2,7 +2,7 @@ import StockData from 'technicalindicators/declarations/StockData'
 import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
-import { addEVENWeight, addScores } from '../../utils'
+import { addEVENWeight, addScores } from '../../../services/utils'
 
 const oscillatorsList = addEVENWeight(Object.keys(settings).map(name => [name]))
 

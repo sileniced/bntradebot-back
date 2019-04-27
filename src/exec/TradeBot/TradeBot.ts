@@ -71,6 +71,7 @@ class TradeBot {
   // private orderResultTest: TestOrderResult[] = []
 
   private trades: Promise<FinalPair>[] = []
+  private droppedPairs: DroppedPair[]
 
   constructor(user: User) {
 
@@ -87,6 +88,17 @@ class TradeBot {
   }
 
   public async run() {
+    const balance = this.getNormalizedSymbols()
+    const balanceBtc = this.getNormalizedSymbols()
+    const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
+    const differenceBtc = this.getNormalizedSymbols()
+    const difference = this.getNormalizedSymbols()
+
+
+    await Binance.getPairs().then(pairInfo => {
+      this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
+      this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
+    })
     const start = Date.now()
     const logger = new Logger()
 
@@ -96,19 +108,8 @@ class TradeBot {
     const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
 
-    await Binance.getPairs().then(pairInfo => {
-      this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
-      this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
-    })
-
     this.analysis = new Analysis({ pairsInfo: this.pairsInfo, getNormalizedSymbols: this.getNormalizedSymbols })
     const analysisPromise = this.analysis.run(logger)
-
-    const balance = this.getNormalizedSymbols()
-    const balanceBtc = this.getNormalizedSymbols()
-    const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
-    const differenceBtc = this.getNormalizedSymbols()
-    const difference = this.getNormalizedSymbols()
 
     await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
     .then(([btcUsdtPrice, pricesBtc, balances]) => {
@@ -143,7 +144,7 @@ class TradeBot {
 
     const dropPair = (pair: DroppedPair): boolean => {
       logger.droppedPair(pair)
-      // this.DroppedPairs[pair.pair] = { ...pair, dropCode }
+      this.droppedPairs.push(pair)
       return false
     }
 
@@ -283,6 +284,7 @@ class TradeBot {
     this.negotiationTable.run()
     await Promise.all(this.trades)
 
+    this.entity.droppedPairs = this.droppedPairs
     if (logger.hasTrades()) logger.trades()
 
     const newBalance: { [symbol: string]: number } = this.getNormalizedSymbols()

@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import setupDb from './db'
-import BinanceApi from './services/Binance'
+import BinanceApi from './exec/Binance'
 
 // const app = new Koa()
 // const server = new Server(app.callback())
