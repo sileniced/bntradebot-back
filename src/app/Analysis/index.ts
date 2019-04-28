@@ -55,7 +55,7 @@ class Analysis implements IAnalysis {
   private readonly techAnalysisWeights = {
     candlesticks: 0.14,
     oscillators: 0.29,
-    movingAverage: 0.29,
+    moveBack: 0.29,
     priceChange: 0.29
   }
   private readonly symbolPieWeights = { tech: 0.4, news: 0.1, markets: 0.5 }
@@ -146,7 +146,7 @@ class Analysis implements IAnalysis {
           this.techPairScore[this.pairs[i]] += (
             (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
             + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
-            + (MovingAverages(candles)._score * this.techAnalysisWeights.movingAverage)
+            + (MovingAverages(candles).moveBackScore * this.techAnalysisWeights.moveBack)
             + (PriceChangeAnalysis(candles) * this.techAnalysisWeights.priceChange)
           ) * this.intervalWeights[j]
         }))
@@ -201,13 +201,35 @@ class Analysis implements IAnalysis {
       .filter(pair => this.marketSymbols.includes(pair.baseAsset) && this.marketSymbols.includes(pair.quoteAsset))
       .forEach(pair => {
         const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
+        console.log('START')
+        console.table({
+          pair: pair.symbol,
+          score: this.techPairScore[pair.symbol],
+          baseTechScore,
+          baseN: pair.baseAsset,
+          base: this.marketScore[pair.baseAsset].poweredScore,
+          quoteN: pair.quoteAsset,
+          quote: this.marketScore[pair.quoteAsset].poweredScore,
+        })
+        console.table(this.marketScore)
         if (baseTechScore > 0) {
           this.marketScore[pair.baseAsset].poweredScore += this.marketScore[pair.quoteAsset].poweredScore * baseTechScore
           this.marketScore[pair.quoteAsset].poweredScore -= this.marketScore[pair.baseAsset].poweredScore * baseTechScore
         } else {
-          this.marketScore[pair.quoteAsset].poweredScore += this.marketScore[pair.baseAsset].poweredScore * baseTechScore
-          this.marketScore[pair.baseAsset].poweredScore -= this.marketScore[pair.quoteAsset].poweredScore * baseTechScore
+          this.marketScore[pair.quoteAsset].poweredScore += this.marketScore[pair.baseAsset].poweredScore * -baseTechScore
+          this.marketScore[pair.baseAsset].poweredScore -= this.marketScore[pair.quoteAsset].poweredScore * -baseTechScore
         }
+        console.table({
+          pair: pair.symbol,
+          score: this.techPairScore[pair.symbol],
+          baseTechScore,
+          baseN: pair.baseAsset,
+          base: this.marketScore[pair.baseAsset].poweredScore,
+          quoteN: pair.quoteAsset,
+          quote: this.marketScore[pair.quoteAsset].poweredScore,
+        })
+        console.table(this.marketScore)
+        console.log('STOP')
       })
 
     }
