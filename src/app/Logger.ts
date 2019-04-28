@@ -65,7 +65,8 @@ class Logger implements ILogger {
     const data = this._marketAnalysis.sort((a, b) => b.poweredScore - a.poweredScore)
     logRow(data.map(({ quoteSymbol }) => quoteSymbol), 'Quote')
     logRow(data.map(({ score }) => score), 'Score')
-    logRow(data.map(({ poweredScore }) => poweredScore), 'Power')
+    logRow(data.map(({ poweredScore }) => poweredScore), 'Powered')
+    logRow(data.map(({ battleScore }) => battleScore), 'Battled')
     console.log('')
   }
 

@@ -26,6 +26,7 @@ export interface MarketAnalysisResult {
   score: number,
   multiplier: number
   poweredScore: number
+  battleScore: number
 }
 
 export interface IAnalysis {
@@ -59,7 +60,7 @@ class Analysis implements IAnalysis {
     crosses: 0.256,
     priceChange: 0.235
   }
-  private readonly symbolPieWeights = { tech: 0.4, news: 0.1, markets: 0.5 }
+  private readonly symbolPieWeights = { tech: 0.4, news: 0.05, markets: 0.55 }
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
@@ -106,7 +107,8 @@ class Analysis implements IAnalysis {
       quoteSymbol: 'ALTS',
       score: 0,
       multiplier: 0,
-      poweredScore: 0
+      poweredScore: 0,
+      battleScore: 0
     }
 
     const quoteSymbols = Object.entries(pairsInfo.map(pair => pair.quoteAsset)
@@ -189,31 +191,39 @@ class Analysis implements IAnalysis {
         quoteSymbol,
         score: quoteScore,
         multiplier: quoteMultiplier,
-        poweredScore: quoteScore + quoteMultiplier
+        poweredScore: quoteScore + quoteMultiplier,
+        battleScore: quoteScore + quoteMultiplier
       }
 
       this.marketScore['ALTS'].score += baseScore / qen
       this.marketScore['ALTS'].multiplier += baseMultiplier / qen
       this.marketScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
+      this.marketScore['ALTS'].battleScore += baseScore + baseMultiplier / qen
+
     }
 
     for (let i = 0; i < qen; i++) {
       const quoteSymbol = this.marketSymbols[i]
-
       this.pairsPerSymbol[quoteSymbol]
-      .filter(pair => this.marketSymbols.includes(pair.baseAsset) && this.marketSymbols.includes(pair.quoteAsset))
+      .filter(pair => this.marketSymbols.includes(pair.baseAsset) && pair.quoteAsset === quoteSymbol)
       .forEach(pair => {
         const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
         if (baseTechScore > 0) {
-          this.marketScore[pair.baseAsset].poweredScore += this.marketScore[pair.baseAsset].poweredScore * baseTechScore
-          this.marketScore[pair.quoteAsset].poweredScore -= this.marketScore[pair.quoteAsset].poweredScore * baseTechScore
+          this.marketScore[pair.baseAsset].battleScore += this.marketScore[pair.baseAsset].poweredScore
+          this.marketScore[pair.quoteAsset].battleScore -= this.marketScore[pair.quoteAsset].poweredScore
         } else {
-          this.marketScore[pair.quoteAsset].poweredScore += this.marketScore[pair.quoteAsset].poweredScore * -baseTechScore
-          this.marketScore[pair.baseAsset].poweredScore -= this.marketScore[pair.baseAsset].poweredScore * -baseTechScore
+          this.marketScore[pair.quoteAsset].battleScore += this.marketScore[pair.quoteAsset].poweredScore
+          this.marketScore[pair.baseAsset].battleScore -= this.marketScore[pair.baseAsset].poweredScore
         }
       })
-
     }
+
+    for (let i = 0; i < qen; i++) {
+      const quoteSymbol = this.marketSymbols[i]
+      this.marketScore[quoteSymbol].battleScore = this.marketScore[quoteSymbol].battleScore < 0 ? 0 : this.marketScore[quoteSymbol].battleScore
+    }
+
+    console.table(this.marketScore)
 
     for (let i = 0; i < qen; i++) {
       logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
@@ -240,11 +250,12 @@ class Analysis implements IAnalysis {
       }
       const collector = this.assignedPair[pair.symbol].collector
       const marketQuoteSymbol = this.marketSymbols.includes(collector) ? collector : 'ALTS'
-      const poweredScore = this.marketScore[marketQuoteSymbol].poweredScore
+      const battleScore = this.marketScore[marketQuoteSymbol].battleScore
       const altDivider = (marketQuoteSymbol === 'ALTS' ? qen : 1)
       this.techSymbolScore[collector] += Math.abs(baseScore) / this.pairsPerSymbol[collector].length
-      this.marketSymbolScore[collector] += (this.techSymbolScore[collector] + poweredScore) / altDivider
-      this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] + poweredScore) / altDivider
+      this.marketSymbolScore[collector] += (this.techSymbolScore[collector] + battleScore) / altDivider
+      this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] + battleScore) / altDivider
+
 
       logger.addPairAnalysis({
         pair: pair.symbol,
@@ -255,6 +266,7 @@ class Analysis implements IAnalysis {
 
     }
     logger.pairAnalysis()
+    console.table(this.techPairScore)
 
     await newsAnalysisPromise
     logger.newsPosts()
@@ -262,11 +274,13 @@ class Analysis implements IAnalysis {
     const sen = this.symbols.length
     for (let i = 0; i < sen; i++) {
       const symbol = this.symbols[i]
-      this.symbolTotals[symbol] += this.marketScore[this.marketSymbols.includes(symbol) ? symbol : 'ALTS'].poweredScore * this.symbolPieWeights.markets
+      this.symbolTotals[symbol] += this.marketScore[this.marketSymbols.includes(symbol) ? symbol : 'ALTS'].battleScore * this.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
       this.symbolTotals[symbol] += (this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]) * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     }
+
+    console.table(this.symbolTotals)
 
     /** this.symbolPie = */
     for (let i = 0; i < sen; i++) {
