@@ -320,8 +320,6 @@ class TradeBot {
     this.entity.dollarDiffPostTrade = this.dollarDiff
     const savedEntity = await this.entity.save()
 
-    console.table(this.savedOrders)
-
     await Promise.all(this.savedOrders.map(order => {
       order.tradeBotEntity = savedEntity
       return order.save()

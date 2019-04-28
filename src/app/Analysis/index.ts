@@ -58,7 +58,7 @@ class Analysis implements IAnalysis {
     movingAverage: 0.29,
     priceChange: 0.29
   }
-  private readonly symbolPieWeights = { tech: 0.5, news: 0.1, markets: 0.4 }
+  private readonly symbolPieWeights = { tech: 0.4, news: 0.1, markets: 0.5 }
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
@@ -179,7 +179,6 @@ class Analysis implements IAnalysis {
       moet het eerst kijken naar market1.
        */
 
-
       const quoteMultiplier = Math.sqrt(quoteScore)
       const baseMultiplier = Math.sqrt(baseScore)
 
@@ -189,13 +188,33 @@ class Analysis implements IAnalysis {
         multiplier: quoteMultiplier,
         poweredScore: quoteScore + quoteMultiplier
       }
-      logger.addMarketAnalysis(this.marketScore[quoteSymbol])
 
       this.marketScore['ALTS'].score += baseScore / qen
       this.marketScore['ALTS'].multiplier += baseMultiplier / qen
       this.marketScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
     }
 
+    for (let i = 0; i < qen; i++) {
+      const quoteSymbol = this.marketSymbols[i]
+
+      this.pairsPerSymbol[quoteSymbol]
+      .filter(pair => this.marketSymbols.includes(pair.baseAsset) && this.marketSymbols.includes(pair.quoteAsset))
+      .forEach(pair => {
+        const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 5
+        if (baseTechScore > 0) {
+          this.marketSymbols[pair.baseAsset] += this.marketSymbols[pair.quoteAsset] * baseTechScore
+          this.marketSymbols[pair.quoteAsset] -= this.marketSymbols[pair.baseAsset] * baseTechScore
+        } else {
+          this.marketSymbols[pair.quoteAsset] += this.marketSymbols[pair.baseAsset] * baseTechScore
+          this.marketSymbols[pair.baseAsset] -= this.marketSymbols[pair.quoteAsset] * baseTechScore
+        }
+      })
+
+    }
+
+    for (let i = 0; i < qen; i++) {
+      logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
+    }
     logger.addMarketAnalysis(this.marketScore['ALTS'])
     logger.marketAnalysis()
 
@@ -247,7 +266,9 @@ class Analysis implements IAnalysis {
     }
 
     /** this.symbolPie = */
-    for (let i = 0; i < sen; i++) this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
+    for (let i = 0; i < sen; i++) {
+      this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
+    }
     logger.addTime({ item: 'analysis', time: Date.now() - start })
   }
 }
