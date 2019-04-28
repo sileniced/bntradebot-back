@@ -11,4 +11,7 @@ export default ({ close }: StockData) => Object.keys(settings).reduce((acc, movi
     return acc
   }, {})
   return acc
-}, {})
+}, {
+  EMA: {},
+  SMA: {}
+})
