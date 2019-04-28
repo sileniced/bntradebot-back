@@ -200,13 +200,13 @@ class Analysis implements IAnalysis {
       this.pairsPerSymbol[quoteSymbol]
       .filter(pair => this.marketSymbols.includes(pair.baseAsset) && this.marketSymbols.includes(pair.quoteAsset))
       .forEach(pair => {
-        const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 5
+        const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
         if (baseTechScore > 0) {
-          this.marketSymbols[pair.baseAsset] += this.marketSymbols[pair.quoteAsset] * baseTechScore
-          this.marketSymbols[pair.quoteAsset] -= this.marketSymbols[pair.baseAsset] * baseTechScore
+          this.marketScore[pair.baseAsset].poweredScore += this.marketScore[pair.quoteAsset].poweredScore * baseTechScore
+          this.marketScore[pair.quoteAsset].poweredScore -= this.marketScore[pair.baseAsset].poweredScore * baseTechScore
         } else {
-          this.marketSymbols[pair.quoteAsset] += this.marketSymbols[pair.baseAsset] * baseTechScore
-          this.marketSymbols[pair.baseAsset] -= this.marketSymbols[pair.quoteAsset] * baseTechScore
+          this.marketScore[pair.quoteAsset].poweredScore += this.marketScore[pair.baseAsset].poweredScore * baseTechScore
+          this.marketScore[pair.baseAsset].poweredScore -= this.marketScore[pair.quoteAsset].poweredScore * baseTechScore
         }
       })
 
