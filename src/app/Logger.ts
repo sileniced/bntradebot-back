@@ -1,5 +1,5 @@
 import { MarketAnalysisResult } from './Analysis'
-import { DroppedPair, FinalPair } from './TradeBot/TradeBot'
+import { DroppedPair, Trade } from './TradeBot/TradeBot'
 import { parseDropCode } from '../services/utils'
 
 function parseValue(value: any) {
@@ -134,8 +134,8 @@ class Logger implements ILogger {
     logRow([pair.side, pair.provider, pair.collector, ...parseDropCode(pair)], pair.pair, len)
   }
 
-  private _trades: FinalPair[] = []
-  public addTrade = (pair: FinalPair) => {
+  private _trades: Trade[] = []
+  public addTrade = (pair: Trade) => {
     this._trades.push(pair)
   }
 

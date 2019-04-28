@@ -134,27 +134,25 @@ class BinanceApi {
     this.authenticatedApi[user.id].order(order)
     .then((result: RealOrderResult) => SavedOrder.create({
         user,
-        clientOrderId: result.clientOrderId,
-        orderId: result.orderId,
+        ...result,
         pair: result.symbol,
-        side: result.side,
-        transactTime: result.transactTime,
         executedQty: parseFloat(result.executedQty),
         cummulativeQuoteQty: parseFloat(result.cummulativeQuoteQty),
         feeDollars
-      }).save()
+      })
     )
     .catch(error => {
       console.error(error)
       return error
     })
 
-  public newOrderTest = (user: User, feeDollars: number, order: NewOrder): Promise<TestOrderResult> =>
+  public newOrderTest = (user: User, feeDollars: number, order: NewOrder): Promise<SavedOrder> =>
     this.authenticatedApi[user.id].orderTest(order)
     .then((result: any) => {
+      result.baseAmount = order.quantity
       result.pair = order.symbol
       result.feeDollars = feeDollars
-      result.orderId = 'true'
+      result.orderId = 'test'
       return result
     })
     .catch(error => {

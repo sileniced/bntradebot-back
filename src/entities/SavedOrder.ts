@@ -1,5 +1,6 @@
 import { BaseEntity, Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm'
 import User from './User'
+import TradeBotEntity from './TradeBotEntity'
 
 @Entity()
 class SavedOrder extends BaseEntity {
@@ -9,6 +10,9 @@ class SavedOrder extends BaseEntity {
 
   @ManyToOne(() => User, user => user.savedOrders)
   public user: User
+
+  @ManyToOne(() => TradeBotEntity, tradeBotEntity => tradeBotEntity.savedOrders)
+  public tradeBotEntity: TradeBotEntity
 
   @Column('text', { nullable: false })
   public clientOrderId: string

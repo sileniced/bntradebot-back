@@ -3,6 +3,7 @@ import { Exclude } from 'class-transformer'
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import { BaseEntity } from 'typeorm/repository/BaseEntity'
 import SavedOrder from './SavedOrder'
+import TradeBotEntity from './TradeBotEntity'
 
 @Entity()
 class User extends BaseEntity {
@@ -29,6 +30,9 @@ class User extends BaseEntity {
 
   @Column('bool', { nullable: true })
   public autoTrading: boolean
+
+  @OneToMany(() => TradeBotEntity, tradeBotEntity => tradeBotEntity.user)
+  public tradeBotEntity: TradeBotEntity
 
   @OneToMany(() => SavedOrder, savedOrder => savedOrder.user)
   public savedOrders: SavedOrder

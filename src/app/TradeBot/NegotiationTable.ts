@@ -1,4 +1,4 @@
-import { CandidatePair, DroppedPair, FinalPair } from './TradeBot'
+import { CandidatePair, DroppedPair, Trade } from './TradeBot'
 
 export interface ParticipantPair extends CandidatePair {
   collectorScore: number,
@@ -30,7 +30,7 @@ export interface Collector {
 
 export interface NegotiationTableInput {
   dropPair: (candidatePair: DroppedPair) => boolean
-  addToFinalPairs: (pair: FinalPair) => void
+  addToFinalPairs: (pair: Trade) => void
 }
 
 function parseStepSize(qty: number, stepSize: number) {
@@ -49,7 +49,7 @@ class NegotiationTable implements INegotiationTable {
   private candidatePairs: ParticipantPair[] = []
 
   private readonly dropPair: (pair: DroppedPair) => boolean
-  private readonly addToFinalPairs: (pair: FinalPair) => void
+  private readonly addToFinalPairs: (pair: Trade) => void
 
   public providerFundsBtc: { [providerSymbol: string]: number } = {}
   public providerFunds: { [providerSymbol: string]: number } = {}
@@ -190,7 +190,7 @@ class NegotiationTable implements INegotiationTable {
         continue
       }
 
-      this.addToFinalPairs(pair as FinalPair)
+      this.addToFinalPairs(pair as Trade)
     }
   }
 }

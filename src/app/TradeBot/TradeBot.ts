@@ -4,9 +4,10 @@ import { OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../Logger'
-import TradeBotEntity from '../../entities/TradeBotEntity'
+import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
+import SavedOrder from '../../entities/SavedOrder'
 
-export interface FinalPair extends ParticipantPair {
+export interface Trade extends ParticipantPair {
   score: number,
   baseAmount: number
   baseSymbol: string
@@ -28,14 +29,13 @@ export interface CandidatePair extends AssignedPair {
 export interface DroppedPair {
   pair: string
   score: number
-  price?: number
+  price: number
   side: OrderSide
   provider: string
   collector: string
-  pairScore?: number
-  minBase?: number
-  minQuote?: number
-  stepSize?: number
+  minBase: number
+  minQuote: number
+  stepSize: number
   dropCode: number
   providerFundsBtc?: number
   collectorAmountBtc?: number
@@ -47,37 +47,37 @@ export interface DroppedPair {
 
 class TradeBot {
 
+  protected readonly user: User
   private entity: TradeBotEntity
 
   // todo: get from user database ('USDT' required)
   readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO']
-
   protected pairsInfo: Symbol[] = []
 
-  protected readonly user: User
-
+  private balance: { [pair: string]: number } = {}
+  private balancePostTrade: { [pair: string]: number } = {}
   private prices: { [pair: string]: number } = { ['BTCBTC']: 1 }
-
   private balanceTotalBtc: number = 0
-
   private analysis: Analysis
-
-  // private DroppedPairs: { [pair: string]: DroppedPair } = {}
 
   private negotiationTable: NegotiationTable
 
-  // private finalPairs: FinalPair[] = []
-  // private orderResult: SavedOrder[] = []
-  // private orderResultTest: TestOrderResult[] = []
+  private tradePromises: Promise<void>[] = []
 
-  private trades: Promise<FinalPair>[] = []
-  private droppedPairs: DroppedPair[]
+  private trades: Trade[] = []
+  private savedOrders: SavedOrder[] = []
+  private droppedPairs: DroppedPair[] = []
+  private dollarDiff: number
 
   constructor(user: User) {
 
     this.user = user
     this.entity = new TradeBotEntity()
+    this.entity.user = user
     this.entity.symbols = this.symbols
+
+    this.balance = this.getNormalizedSymbols()
+    this.balancePostTrade = this.getNormalizedSymbols()
 
   }
 
@@ -88,7 +88,6 @@ class TradeBot {
   }
 
   public async run() {
-    const balance = this.getNormalizedSymbols()
     const balanceBtc = this.getNormalizedSymbols()
     const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     const differenceBtc = this.getNormalizedSymbols()
@@ -122,17 +121,15 @@ class TradeBot {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
         if (amount > 0 && this.symbols.includes(balance.asset)) {
-          balance[balance.asset] += amount
+          this.balance[balance.asset] += amount
           balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
           dollarBalance[balance.asset] += balanceBtc[balance.asset] * this.prices['BTCUSDT']
           this.balanceTotalBtc += balanceBtc[balance.asset]
         }
       }
-
-      this.entity.pricesPairs = this.prices
-      this.entity.balanceSymbols = balance
-
     })
+
+    this.entity.balanceSymbols = this.balance
 
     logger.startLog({
       btc: this.balanceTotalBtc,
@@ -147,18 +144,19 @@ class TradeBot {
       return false
     }
 
-    const addToFinalPairs = (pair: FinalPair) => {
+    const addToFinalPairs = (pair: Trade) => {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
-      this.trades.push(Binance.newOrder(this.user, pair.feeDollar, {
+      this.tradePromises.push(Binance.newOrder(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),
           type: 'MARKET'
-        }).then(result => {
+        }).then((result: SavedOrder) => {
           pair.success = !!result.orderId
           logger.addTrade(pair)
-          return pair
+          this.savedOrders.push(result)
+          this.trades.push(pair)
         })
       )
     }
@@ -182,7 +180,7 @@ class TradeBot {
 
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore
-    this.entity.marketSymbols = this.analysis.marketSymbols
+    this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
       acc[market] = this.analysis.marketScore[market].score
       return acc
@@ -205,7 +203,7 @@ class TradeBot {
           spendableBtc: differenceBtc[symbol],
           spendable: difference[symbol],
           totalSpendableBtc: balanceBtc[symbol],
-          totalSpendable: balance[symbol],
+          totalSpendable: this.balance[symbol],
           logger: symbol
         })
       } else if (differenceBtc[symbol] < 0) {
@@ -279,14 +277,16 @@ class TradeBot {
       /* todo: HIER MOET NOG IETS, WANNEER EEN COLLECTOR GEEN PAIR HEEFT */
 
     }
+    this.entity.pricesPairs = this.prices
 
     this.negotiationTable.run()
-    await Promise.all(this.trades)
+    await Promise.all(this.tradePromises)
 
     this.entity.droppedPairs = this.droppedPairs
-    if (logger.hasTrades()) logger.trades()
+    this.entity.tradePairs = this.trades as TradePairEntity[]
 
-    const newBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
+    if (this.trades.length > 0) logger.trades()
+
     const newDollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     let newTotalBtc = 0
 
@@ -298,22 +298,35 @@ class TradeBot {
           const amountBtc = amount * this.prices[`${balance.asset}BTC`]
           newTotalBtc += amountBtc
           newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
+          this.balancePostTrade[balance.asset] = amount
         }
       }
     })
 
-    this.entity.balancePostTradeSymbols = newBalance
+    this.entity.balancePostTradeSymbols = this.balancePostTrade
+
+    this.dollarDiff = (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT'])
 
     logger.endLog({
       oldDollarBalance: dollarBalance,
       newDollarBalance: newDollarBalance,
       btc: newTotalBtc,
       dollar: newTotalBtc * this.prices['BTCUSDT'],
-      dollarDiff: (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT']),
+      dollarDiff: this.dollarDiff,
       tradeTime: Date.now() - start
     })
 
-    await this.entity.save()
+    this.entity.tradeTime = new Date()
+    this.entity.dollarDiffPostTrade = this.dollarDiff
+    const savedEntity = await this.entity.save()
+
+    console.table(this.savedOrders)
+
+    await Promise.all(this.savedOrders.map(order => {
+      order.tradeBotEntity = savedEntity
+      return order.save()
+    }))
+    .catch(console.error)
 
   }
 
