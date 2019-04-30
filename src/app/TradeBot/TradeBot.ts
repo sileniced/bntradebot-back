@@ -51,7 +51,7 @@ class TradeBot {
   private entity: TradeBotEntity
 
   // todo: get from user database ('USDT' required)
-  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO']
+  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO', 'IOTA']
   protected pairsInfo: Symbol[] = []
 
   private balance: { [pair: string]: number } = {}
