@@ -223,8 +223,6 @@ class Analysis implements IAnalysis {
       this.marketScore[quoteSymbol].battleScore = this.marketScore[quoteSymbol].battleScore < 0 ? 0 : this.marketScore[quoteSymbol].battleScore
     }
 
-    console.table(this.marketScore)
-
     for (let i = 0; i < qen; i++) {
       logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
     }
@@ -266,7 +264,6 @@ class Analysis implements IAnalysis {
 
     }
     logger.pairAnalysis()
-    console.table(this.techPairScore)
 
     await newsAnalysisPromise
     logger.newsPosts()
@@ -279,8 +276,6 @@ class Analysis implements IAnalysis {
       this.symbolTotals[symbol] += (this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]) * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     }
-
-    console.table(this.symbolTotals)
 
     /** this.symbolPie = */
     for (let i = 0; i < sen; i++) {
