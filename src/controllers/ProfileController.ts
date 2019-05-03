@@ -11,12 +11,24 @@ class ProfileController {
   public async getProfile(
     @CurrentUser() user: User
   ) {
-    return await TradeBotEntity.find({
+    const trades = await TradeBotEntity.find({
       where: {
         user,
         tradeTime: Raw(alias => `${alias} > NOW() - INTERVAL '1 DAY'`)
       }
     })
+
+    return trades.map(trade => ({
+      ...trade,
+      pricesPairs: trade.pricesPairs,
+      balanceSymbols: trade.balanceSymbols,
+      analysisTechPairs: trade.analysisTechPairs,
+      analysisMarket: trade.analysisMarket,
+      symbolPie: trade.symbolPie,
+      droppedPairs: trade.droppedPairs,
+      tradePairs: trade.tradePairs,
+      balancePostTradeSymbols: trade.balancePostTradeSymbols
+    }))
   }
 }
 
