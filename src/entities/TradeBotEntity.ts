@@ -166,7 +166,7 @@ class TradeBotEntity extends BaseEntity {
     for (let i = 0, len = split.length; i < len; i += 3) {
       trades.push({
         pair: split[i],
-        baseAmount: parseInt(split[i + 1]),
+        baseAmount: parseFloat(split[i + 1]),
         status: split[i + 2]
       } as TradePairEntity)
     }
