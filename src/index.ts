@@ -1,52 +1,59 @@
 import 'reflect-metadata'
+import { Action, useKoaServer } from 'routing-controllers'
+import { Server } from 'http'
+import * as Koa from 'koa'
 import setupDb from './db'
-import BinanceApi from './app/Binance'
+import { verify } from './jwt'
 
-// const app = new Koa()
-// const server = new Server(app.callback())
+import User from './entities/User'
+import BinanceApi from './app/Binance'
+import LoginController from './logins/LoginController'
+import UserController from './controllers/UserController'
+import ProfileController from './controllers/ProfileController'
+
+const app = new Koa()
+const server = new Server(app.callback())
 // export const io = IO(server)
 export const Binance = new BinanceApi()
 
-// const port = process.env.PORT || 4000
+const port = process.env.PORT || 4000
 
-// useKoaServer(app, {
-//   cors: true,
-//   controllers: [
-//     // HomeController,
-//     LoginController,
-//     UserController,
-//     PublicController,
-//     AuthenticatedController
-//   ],
-//   authorizationChecker: (action: Action) => {
-//     const header: string = action.request.headers.authorization
-//     if (header && header.startsWith('Bearer ')) {
-//       const [, token] = header.split(' ')
-//       return !!(token && verify(token))
-//     }
-//     return false
-//   },
-//   currentUserChecker: async (action: Action) => {
-//     const header: string = action.request.headers.authorization
-//     if (header && header.startsWith('Bearer ')) {
-//       const [, token] = header.split(' ')
-//       if (token) {
-//         const id = verify(token).data.id
-//         const user = await User.findOne(id)
-//         if (!user) return undefined
-//         if (!Binance.checkAuthenticatedApi(user.id)) {
-//           Binance.setAuthenticatedApi(user.id, {
-//             apiKey: user.binanceKey,
-//             apiSecret: user.binanceSecret
-//           })
-//           console.log(`new Auth user: ${user.fullName()}`)
-//         }
-//         return user
-//       }
-//     }
-//     return undefined
-//   }
-// })
+useKoaServer(app, {
+  cors: true,
+  controllers: [
+    LoginController,
+    UserController,
+    ProfileController
+  ],
+  authorizationChecker: (action: Action) => {
+    const header: string = action.request.headers.authorization
+    if (header && header.startsWith('Bearer ')) {
+      const [, token] = header.split(' ')
+      return !!(token && verify(token))
+    }
+    return false
+  },
+  currentUserChecker: async (action: Action) => {
+    const header: string = action.request.headers.authorization
+    if (header && header.startsWith('Bearer ')) {
+      const [, token] = header.split(' ')
+      if (token) {
+        const id = verify(token).data.id
+        const user = await User.findOne(id)
+        if (!user) return undefined
+        if (!Binance.checkAuthenticatedApi(user.id)) {
+          Binance.setAuthenticatedApi(user.id, {
+            apiKey: user.binanceKey,
+            apiSecret: user.binanceSecret
+          })
+          console.log(`new Auth user: ${user.fullName()}`)
+        }
+        return user
+      }
+    }
+    return undefined
+  }
+})
 
 // io.use(socketIoJwtAuth.authenticate({ secret }, async (payload, done) => {
 //   const user = await User.findOne(payload.id)
@@ -64,14 +71,14 @@ export const Binance = new BinanceApi()
 // })
 
 setupDb().then(() => {
-  // server.listen(port, () => {
-  //   console.log(`Listening on port ${port}`)
+  server.listen(port, () => {
+    console.log(`Listening on port ${port}`)
 
     Binance.getTime().then(time => {
       Binance.startAutoTradeBots()
       console!.log(`Binance time diff: ${time - Date.now()}ms`)
     })
-  // })
+  })
 })
 .catch((err) => console!.error(err))
 
