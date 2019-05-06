@@ -50,3 +50,5 @@ export const parseDropCode = pair => {
   }
 
 }
+
+export const numShort = num => Math.round(num * 100000)

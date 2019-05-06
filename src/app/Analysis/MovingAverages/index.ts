@@ -2,17 +2,22 @@ import StockData from 'technicalindicators/declarations/StockData'
 import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
-import { addNAÏVEWeight, addScores } from '../../../services/utils'
+import { addNAÏVEWeight, addScores, numShort } from '../../../services/utils'
+import { CrossCollector, MoveBackCollector } from '../../../entities/ScoresWeightsEntityV1'
 
 const emaMovingAveragesList = addNAÏVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
 const smaMovingAveragesList = addNAÏVEWeight(settings.SMA.periods.map(period => [`SMA${period}`]))
 
-export default (data: StockData) => {
+export default (data: StockData, moveBackDataCollector: MoveBackCollector, crossDataCollector: CrossCollector) => {
   const values = Values(data)
   const close = data.close.slice(-1)[0]
   const scoring = Scoring(close, values)
 
   const emaMoveBackAnalysis = emaMovingAveragesList.reduce((acc, [name, weight]) => {
+    moveBackDataCollector[name] = {
+      w: numShort(weight),
+      s: numShort(scoring[name]._score)
+    }
     acc[name] = {
       _score: scoring[name]._score * weight
       // _unweightedScore: scoring[name]._score,
@@ -23,6 +28,10 @@ export default (data: StockData) => {
   }, {})
 
   const smaMoveBackAnalysis = smaMovingAveragesList.reduce((acc, [name, weight]) => {
+    moveBackDataCollector[name] = {
+      w: numShort(weight),
+      s: numShort(scoring[name]._score)
+    }
     acc[name] = {
       _score: scoring[name]._score * weight
       // _unweightedScore: scoring[name]._score,
@@ -49,9 +58,12 @@ export default (data: StockData) => {
     }, 0)
   }, 0)
 
+  const crossScore = ((emaCrossAnalysis / maxScore) + (smaCrossAnalysis / maxScore)) / 2
+  crossDataCollector.s = numShort(crossScore)
+
   return {
     moveBackScore: (addScores(emaMoveBackAnalysis) + addScores(smaMoveBackAnalysis)) / 2,
-    crossScore: ((emaCrossAnalysis / maxScore) + (smaCrossAnalysis / maxScore)) / 2
+    crossScore: crossScore
     // _close: close,
     // analysis
   }

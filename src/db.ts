@@ -4,13 +4,15 @@ import { CustomNamingStrategy } from './customNamingStrategy'
 import User from './entities/User'
 import SavedOrder from './entities/SavedOrder'
 import TradeBotEntity from './entities/TradeBotEntity'
+import ScoresWeightsEntityV1 from './entities/ScoresWeightsEntityV1'
 
 const db = () =>
   createConnection({
     entities: [
       User,
       SavedOrder,
-      TradeBotEntity
+      TradeBotEntity,
+      ScoresWeightsEntityV1
     ],
     logging: false,
     namingStrategy: new CustomNamingStrategy(),

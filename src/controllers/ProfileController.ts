@@ -15,7 +15,8 @@ class ProfileController {
       where: {
         user,
         tradeTime: Raw(alias => `${alias} > NOW() - INTERVAL '1 DAY'`)
-      }
+      },
+      relations: ['scoresWeightsV1']
     })
 
     return trades.map(trade => ({

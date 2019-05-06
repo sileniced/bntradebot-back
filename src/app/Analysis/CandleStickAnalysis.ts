@@ -1,6 +1,11 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
-import { addEVENWeight } from '../../services/utils'
+import { addEVENWeight, addNAÏVEWeight, numShort } from '../../services/utils'
+import { CandleStickCollector, CandleStickCollectorAnalysis } from '../../entities/ScoresWeightsEntityV1'
+
+const settings = {
+  depth: 50
+}
 
 const bullishArr = addEVENWeight([
   ['BullishEngulfingPattern', 2],
@@ -43,7 +48,7 @@ const sliceStockData = (data: StockData, last: number): StockData => ({
   low: data.low.slice(-last)
 })
 
-export default (data: StockData) => {
+const run = (data: StockData, dataCollector: CandleStickCollectorAnalysis) => {
   const dataLast = {
     [1]: sliceStockData(data, 1),
     [2]: sliceStockData(data, 2),
@@ -51,21 +56,33 @@ export default (data: StockData) => {
     [5]: sliceStockData(data, 5)
   }
 
-  const arrReducer = (acc, [name, amount, weight], _, src) => {
-    acc[name] = TI[name.toLowerCase()](dataLast[amount])
-    acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
-    acc._unSigmoidScore += acc[name] ? weight : 0
-    acc._count += acc[name] ? 1 : 0
-    return acc
-  }
-
   const analysis = {
-    bullish: bullishArr.reduce(arrReducer, {
+    bullish: bullishArr.reduce((acc, [name, amount, weight], _, src) => {
+      acc[name] = TI[name.toLowerCase()](dataLast[amount])
+      dataCollector.bullish[name] = {
+        w: numShort(weight),
+        s: acc[name] ? 1 : 0
+      }
+      acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
+      acc._unSigmoidScore += acc[name] ? weight : 0
+      acc._count += acc[name] ? 1 : 0
+      return acc
+    }, {
       _score: 0,
       _unSigmoidScore: 0,
       _count: 0
     }),
-    bearish: bearishArr.reduce(arrReducer, {
+    bearish: bearishArr.reduce((acc, [name, amount, weight], _, src) => {
+      acc[name] = TI[name.toLowerCase()](dataLast[amount])
+      dataCollector.bearish[name] = {
+        w: numShort(weight),
+        s: acc[name] ? 1 : 0
+      }
+      acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
+      acc._unSigmoidScore += acc[name] ? weight : 0
+      acc._count += acc[name] ? 1 : 0
+      return acc
+    }, {
       _score: 0,
       _unSigmoidScore: 0,
       _count: 0
@@ -75,7 +92,40 @@ export default (data: StockData) => {
   const score = 0.5 + (analysis.bullish._score / 2) - (analysis.bearish._score / 2)
 
   return {
-    _score: score,
+    _score: score
     // analysis
   }
+}
+
+const shortenStockData = (data: StockData, length: number): StockData => ({
+  open: data.open.slice(0, length),
+  close: data.close.slice(0, length),
+  high: data.high.slice(0, length),
+  low: data.low.slice(0, length)
+})
+
+export default (data: StockData, dataCollector: CandleStickCollector) => {
+
+  const length = data.close.length
+
+  return {
+    _score: addNAÏVEWeight(Array(settings.depth).fill(null)
+    .map((_, idx) => ([idx])))
+    .reduce((acc, [level, weight]) => {
+      dataCollector[level] = {
+        w: numShort(weight),
+        a: {
+          bullish: {},
+          bearish: {}
+        }
+      }
+      return acc + (run(shortenStockData(data, length-level), dataCollector[level].a)._score * weight)
+    }, 0)
+  }
+
+
+
+
+
+
 }

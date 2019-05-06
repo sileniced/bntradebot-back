@@ -8,6 +8,8 @@ import CandleStickAnalysis from './CandleStickAnalysis'
 import AnalysisNews from './NewsAnalysis'
 import Logger from '../Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
+import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
+import { numShort } from '../../services/utils'
 
 export interface AssignedPair {
   pair: string,
@@ -82,6 +84,7 @@ class Analysis implements IAnalysis {
   private symbolTotals: { [pair: string]: number } = {}
   private allTotals: number = 0
 
+  public dataCollector: Partial<ScoresWeightsEntityV1Model> = {}
 
   constructor({ pairsInfo, getNormalizedSymbols }: AnalysisInput) {
 
@@ -130,6 +133,7 @@ class Analysis implements IAnalysis {
       })
       return acc
     }, {})
+
   }
 
   public async run(logger: Logger): Promise<void> {
@@ -137,23 +141,65 @@ class Analysis implements IAnalysis {
     this.newsScore = new AnalysisNews({ symbols: this.symbols })
     const newsAnalysisPromise = this.newsScore.run(logger)
 
+    this.dataCollector.pairs = {}
+
     const techAnalysisPromises: Promise<void>[] = []
 
     /** this.techPairScore[pair] = */
     const pen = this.pairs.length
     const ien = this.intervalList.length
     for (let i = 0; i < pen; i++) {
+      this.dataCollector.pairs[this.pairs[i]] = {}
       for (let j = 0; j < ien; j++) {
+
         techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
         .then((candles: StockData) => {
-          const movingAverages = MovingAverages(candles)
-          this.techPairScore[this.pairs[i]] += (
-            (Oscillators(candles)._score * this.techAnalysisWeights.oscillators)
-            + (CandleStickAnalysis(candles)._score * this.techAnalysisWeights.candlesticks)
-            + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
-            + (movingAverages.crossScore * this.techAnalysisWeights.crosses)
-            + (PriceChangeAnalysis(candles) * this.techAnalysisWeights.priceChange)
-          ) * this.intervalWeights[j]
+          if (this.dataCollector.pairs) {
+
+            const priceChangeScore = PriceChangeAnalysis(candles)
+
+            this.dataCollector.pairs[this.pairs[i]][this.intervalList[j]] = {
+              w: numShort(this.intervalWeights[j]),
+              a: {
+                tech: {
+                  w: numShort(this.symbolPieWeights.tech),
+                  a: {
+                    oscillators: {
+                      w: numShort(this.techAnalysisWeights.oscillators),
+                      a: {}
+                    },
+                    candlesticks: {
+                      w: numShort(this.techAnalysisWeights.candlesticks),
+                      a: {}
+                    },
+                    moveBack: {
+                      w: numShort(this.techAnalysisWeights.moveBack),
+                      a: {}
+                    },
+                    cross: {
+                      w: numShort(this.techAnalysisWeights.crosses),
+                      s: 0
+                    },
+                    priceChange: {
+                      w: numShort(this.techAnalysisWeights.priceChange),
+                      s: numShort(priceChangeScore)
+                    }
+                  }
+                }
+              }
+            }
+            const collector = this.dataCollector.pairs[this.pairs[i]][this.intervalList[j]].a.tech.a
+
+            const movingAverages = MovingAverages(candles, collector.moveBack.a, collector.cross)
+
+            this.techPairScore[this.pairs[i]] += (
+              (Oscillators(candles, collector.oscillators.a)._score * this.techAnalysisWeights.oscillators)
+              + (CandleStickAnalysis(candles, collector.candlesticks.a)._score * this.techAnalysisWeights.candlesticks)
+              + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
+              + (movingAverages.crossScore * this.techAnalysisWeights.crosses)
+              + (priceChangeScore * this.techAnalysisWeights.priceChange)
+            ) * this.intervalWeights[j]
+          }
         }))
       }
     }
@@ -268,12 +314,30 @@ class Analysis implements IAnalysis {
     await newsAnalysisPromise
     logger.newsPosts()
 
+    this.dataCollector.symbols = {}
+    this.dataCollector.market = {}
+
     const sen = this.symbols.length
     for (let i = 0; i < sen; i++) {
       const symbol = this.symbols[i]
-      this.symbolTotals[symbol] += this.marketScore[this.marketSymbols.includes(symbol) ? symbol : 'ALTS'].battleScore * this.symbolPieWeights.markets
+
+      const newsScore = this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]
+      this.dataCollector.symbols[symbol] = {
+        news: {
+          w: numShort(this.symbolPieWeights.news),
+          s: numShort(newsScore)
+        }
+      }
+
+      const marketSymbol = this.marketSymbols.includes(symbol) ? symbol : 'ALTS'
+      this.dataCollector.market[marketSymbol] = {
+        w: numShort(this.symbolPieWeights.markets),
+        s: numShort(this.marketScore[marketSymbol].battleScore)
+      }
+
+      this.symbolTotals[symbol] += this.marketScore[marketSymbol].battleScore * this.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
-      this.symbolTotals[symbol] += (this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]) * this.symbolPieWeights.news
+      this.symbolTotals[symbol] += newsScore * this.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     }
 

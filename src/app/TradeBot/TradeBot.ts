@@ -6,6 +6,7 @@ import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
+import ScoresWeightsEntityV1 from '../../entities/ScoresWeightsEntityV1'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -177,6 +178,14 @@ class TradeBot {
     const symPieBtc = this.getNormalizedSymbols()
 
     await analysisPromise
+
+    /**
+     * START HANDLING ANALYSIS
+     */
+
+    this.entity.scoresWeightsV1 = await ScoresWeightsEntityV1.create({
+      scoresWeights: this.analysis.dataCollector
+    }).save()
 
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore

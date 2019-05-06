@@ -57,6 +57,10 @@ class BinanceApi {
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
+
+
+
+
     this.activeTradeBotUserIds.forEach(id => {
       new TradeBot(this.activeTradeBotUsers[id]).run()
     })
