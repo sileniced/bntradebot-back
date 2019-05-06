@@ -103,6 +103,7 @@ class TradeBot {
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
+    const allPricesPromise = Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol)))
 
     const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
@@ -286,7 +287,6 @@ class TradeBot {
       /* todo: HIER MOET NOG IETS, WANNEER EEN COLLECTOR GEEN PAIR HEEFT */
 
     }
-    this.entity.pricesPairs = this.prices
 
     this.negotiationTable.run()
     await Promise.all(this.tradePromises)
@@ -315,6 +315,13 @@ class TradeBot {
     this.entity.balancePostTradeSymbols = this.balancePostTrade
 
     this.dollarDiff = (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT'])
+
+    const allPrices = await allPricesPromise
+    this.pairsInfo.forEach((pair, idx) => {
+      this.prices[pair.symbol] = allPrices[idx]
+    })
+
+    this.entity.pricesPairs = this.prices
 
     logger.endLog({
       oldDollarBalance: dollarBalance,
