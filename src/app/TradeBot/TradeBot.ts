@@ -3,7 +3,7 @@ import { Binance } from '../../index'
 import { OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
-import Logger from '../Logger'
+// import Logger from '../Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
 import ScoresWeightsEntityV1 from '../../entities/ScoresWeightsEntityV1'
@@ -98,8 +98,8 @@ class TradeBot {
       this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
       this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
     })
-    const start = Date.now()
-    const logger = new Logger()
+    // const start = Date.now()
+    // const logger = new Logger()
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
@@ -109,7 +109,7 @@ class TradeBot {
     const allPricesPromise = Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol)))
 
     this.analysis = new Analysis({ pairsInfo: this.pairsInfo, getNormalizedSymbols: this.getNormalizedSymbols })
-    const analysisPromise = this.analysis.run(logger)
+    const analysisPromise = this.analysis.run(/*logger*/)
 
     await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
     .then(([btcUsdtPrice, pricesBtc, balances]) => {
@@ -133,15 +133,15 @@ class TradeBot {
 
     this.entity.balanceSymbols = this.balance
 
-    logger.startLog({
-      btc: this.balanceTotalBtc,
-      dollar: this.balanceTotalBtc * this.prices['BTCUSDT'],
-      btcPrice: this.prices['BTCUSDT']
-    })
-    logger.addSymbolPie({ name: '$ Balance', values: dollarBalance })
+    // logger.startLog({
+    //   btc: this.balanceTotalBtc,
+    //   dollar: this.balanceTotalBtc * this.prices['BTCUSDT'],
+    //   btcPrice: this.prices['BTCUSDT']
+    // })
+    // logger.addSymbolPie({ name: '$ Balance', values: dollarBalance })
 
     const dropPair = (pair: DroppedPair): boolean => {
-      logger.droppedPair(pair)
+      // logger.droppedPair(pair)
       this.droppedPairs.push(pair)
       return false
     }
@@ -156,7 +156,7 @@ class TradeBot {
           type: 'MARKET'
         }).then((result: SavedOrder) => {
           pair.success = !!result.orderId
-          logger.addTrade(pair)
+          // logger.addTrade(pair)
           this.savedOrders.push(result)
           this.trades.push(pair)
         })
@@ -227,10 +227,10 @@ class TradeBot {
       }
     }
 
-    logger.addSymbolPie({ name: '$ SymbolPie', values: dollarSymbolPie })
-    logger.addSymbolPie({ name: '$ Diff', values: dollarDifference })
-    logger.symbolPie()
-    logger.startDroppedPairs()
+    // logger.addSymbolPie({ name: '$ SymbolPie', values: dollarSymbolPie })
+    // logger.addSymbolPie({ name: '$ Diff', values: dollarDifference })
+    // logger.symbolPie()
+    // logger.startDroppedPairs()
 
     for (let i = 0, len = collectorSymbols.length; i < len; i++) {
       const collectorSymbol = collectorSymbols[i]
@@ -294,7 +294,7 @@ class TradeBot {
     this.entity.droppedPairs = this.droppedPairs
     this.entity.tradePairs = this.trades as TradePairEntity[]
 
-    if (this.trades.length > 0) logger.trades()
+    // if (this.trades.length > 0) logger.trades()
 
     const newDollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     let newTotalBtc = 0
@@ -323,14 +323,14 @@ class TradeBot {
 
     this.entity.pricesPairs = this.prices
 
-    logger.endLog({
-      oldDollarBalance: dollarBalance,
-      newDollarBalance: newDollarBalance,
-      btc: newTotalBtc,
-      dollar: newTotalBtc * this.prices['BTCUSDT'],
-      dollarDiff: this.dollarDiff,
-      tradeTime: Date.now() - start
-    })
+    // logger.endLog({
+    //   oldDollarBalance: dollarBalance,
+    //   newDollarBalance: newDollarBalance,
+    //   btc: newTotalBtc,
+    //   dollar: newTotalBtc * this.prices['BTCUSDT'],
+    //   dollarDiff: this.dollarDiff,
+    //   tradeTime: Date.now() - start
+    // })
 
     this.entity.tradeTime = new Date()
     this.entity.dollarDiffPostTrade = this.dollarDiff

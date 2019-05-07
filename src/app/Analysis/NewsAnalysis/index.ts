@@ -76,8 +76,8 @@ class AnalysisNews implements IAnalysisNews {
     }, {})
   }
 
-  public run(logger: Logger) {
-    const start = Date.now()
+  public run(/*logger: Logger*/) {
+    // const start = Date.now()
     return Promise.all(this.pages.map((page: number) => {
       return new Promise(resolve => setTimeout(() => {
         resolve(this.cryptoPanicApi(this.symbols, page)
@@ -94,7 +94,7 @@ class AnalysisNews implements IAnalysisNews {
                 this.symbolAnalysisTotals[symbol].postWeightsTotal += postScore._postWeight
                 this.symbolAnalysisTotals[symbol].votesTotal += postScore._totalVotes
                 this.symbolAnalysisTotals[symbol].agesTotal += age
-                logger.addNewsPosts({ title: post.title, score: postScore._score })
+                // logger.addNewsPosts({ title: post.title, score: postScore._score })
               }
             }
           }
@@ -113,7 +113,7 @@ class AnalysisNews implements IAnalysisNews {
           this.symbolAnalysis[symbol] += (score.post + score.vote + score.ages) / src.length
         })
       }
-      logger.addTime({ item: 'news', time: Date.now() - start })
+      // logger.addTime({ item: 'news', time: Date.now() - start })
     })
   }
 }
