@@ -103,10 +103,10 @@ class TradeBot {
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
-    const allPricesPromise = Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol)))
 
     const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
+    const allPricesPromise = Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol)))
 
     this.analysis = new Analysis({ pairsInfo: this.pairsInfo, getNormalizedSymbols: this.getNormalizedSymbols })
     const analysisPromise = this.analysis.run(logger)

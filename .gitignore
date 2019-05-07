@@ -82,3 +82,5 @@ typings/
 .serverless
 
 target
+/src/https/
+src/https/
