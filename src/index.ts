@@ -16,7 +16,7 @@ const server = new Server(app.callback())
 // export const io = IO(server)
 export const Binance = new BinanceApi()
 
-const port = process.env.PORT || 80
+const port = process.env.PORT || 4000
 
 useKoaServer(app, {
   cors: true,
