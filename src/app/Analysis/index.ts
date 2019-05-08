@@ -6,7 +6,7 @@ import Oscillators from './Oscillators'
 import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
 import AnalysisNews from './NewsAnalysis'
-import Logger from '../Logger'
+import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { numShort } from '../../services/utils'
@@ -143,10 +143,10 @@ class Analysis implements IAnalysis {
 
   }
 
-  public async run(/*logger: Logger*/): Promise<void> {
-    // const start = Date.now()
+  public async run(logger: Logger): Promise<void> {
+    const start = Date.now()
     this.newsScore = new AnalysisNews({ symbols: this.symbols })
-    const newsAnalysisPromise = this.newsScore.run(/*logger*/)
+    const newsAnalysisPromise = this.newsScore.run(logger)
 
     this.dataCollector.pairs = {}
 
@@ -229,7 +229,7 @@ class Analysis implements IAnalysis {
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
 
-      /*
+      /**
       todo: HIER MOET NOG IETS: de quote symbols need to battle it out
 
       Als market1 het sterker doet dan market2,
@@ -275,11 +275,11 @@ class Analysis implements IAnalysis {
       this.marketScore[quoteSymbol].battleScore = this.marketScore[quoteSymbol].battleScore < 0 ? 0 : this.marketScore[quoteSymbol].battleScore
     }
 
-    // for (let i = 0; i < qen; i++) {
-      // logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
-    // }
-    // logger.addMarketAnalysis(this.marketScore['ALTS'])
-    // logger.marketAnalysis()
+    for (let i = 0; i < qen; i++) {
+      logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
+    }
+    logger.addMarketAnalysis(this.marketScore['ALTS'])
+    logger.marketAnalysis()
 
     /** this.techSymbolScore[symbol] = */
     /** this.marketSymbolScore[symbol] = */
@@ -307,18 +307,18 @@ class Analysis implements IAnalysis {
       this.marketPairCollectorScore[pair.symbol] = (this.techSymbolScore[collector] + battleScore) / altDivider
 
 
-      // logger.addPairAnalysis({
-      //   pair: pair.symbol,
-      //   side,
-      //   score: this.techPairScore[pair.symbol],
-      //   symbolScore: this.marketPairCollectorScore[pair.symbol]
-      // })
+      logger.addPairAnalysis({
+        pair: pair.symbol,
+        side,
+        score: this.techPairScore[pair.symbol],
+        symbolScore: this.marketPairCollectorScore[pair.symbol]
+      })
 
     }
-    // logger.pairAnalysis()
+    logger.pairAnalysis()
 
     await newsAnalysisPromise
-    // logger.newsPosts()
+    logger.newsPosts()
 
     this.dataCollector.symbols = {}
     this.dataCollector.market = {}
@@ -351,7 +351,7 @@ class Analysis implements IAnalysis {
     for (let i = 0; i < sen; i++) {
       this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
     }
-    // logger.addTime({ item: 'analysis', time: Date.now() - start })
+    logger.addTime({ item: 'analysis', time: Date.now() - start })
   }
 }
 

@@ -1,6 +1,6 @@
-import { MarketAnalysisResult } from './Analysis'
-import { DroppedPair, Trade } from './TradeBot/TradeBot'
-import { parseDropCode } from '../services/utils'
+import { MarketAnalysisResult } from '../app/Analysis'
+import { DroppedPair, Trade } from '../app/TradeBot/TradeBot'
+import { parseDropCode } from './utils'
 
 function parseValue(value: any) {
   switch (typeof value) {
