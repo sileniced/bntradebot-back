@@ -18,6 +18,8 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
+import TradeBotEntity from '../entities/TradeBotEntity'
+import { Raw } from 'typeorm'
 
 export interface RealOrderResult {
   clientOrderId: string;
@@ -58,11 +60,17 @@ class BinanceApi {
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
 
-
-
-
     this.activeTradeBotUserIds.forEach(id => {
       new TradeBot(this.activeTradeBotUsers[id]).run()
+    })
+
+    TradeBotEntity.find({
+      relations: ['scoresWeightsV1'],
+      where: {
+        tradeTime: Raw(alias => `${alias} < NOW() - INTERVAL '1 DAY'`)
+      },
+    }).then(tradeBotEntity => {
+      tradeBotEntity.forEach(entity => entity.scoresWeightsV1.remove())
     })
   }
 

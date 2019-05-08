@@ -46,7 +46,9 @@ class TradeBotEntity extends BaseEntity {
   @OneToMany(() => SavedOrder, savedOrders => savedOrders.tradeBotEntity)
   public savedOrders: SavedOrder
 
-  @OneToOne(() => ScoresWeightsEntityV1)
+  @OneToOne(() => ScoresWeightsEntityV1, {
+    cascade: true
+  })
   @JoinColumn()
   public scoresWeightsV1: ScoresWeightsEntityV1
 
