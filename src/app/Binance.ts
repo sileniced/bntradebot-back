@@ -64,14 +64,14 @@ class BinanceApi {
       new TradeBot(this.activeTradeBotUsers[id]).run()
     })
 
-    TradeBotEntity.find({
-      relations: ['scoresWeightsV1'],
-      where: {
-        tradeTime: Raw(alias => `${alias} < NOW() - INTERVAL '1 DAY'`)
-      },
-    }).then(tradeBotEntity => {
-      tradeBotEntity.forEach(entity => entity.scoresWeightsV1.remove())
-    })
+    // TradeBotEntity.find({
+    //   relations: ['scoresWeightsV1'],
+    //   where: {
+    //     tradeTime: Raw(alias => `${alias} < NOW() - INTERVAL '1 DAY'`)
+    //   },
+    // }).then(tradeBotEntity => {
+    //   tradeBotEntity.forEach(entity => entity.scoresWeightsV1.remove())
+    // })
   }
 
   constructor() {
