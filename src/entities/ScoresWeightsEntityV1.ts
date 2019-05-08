@@ -1,7 +1,7 @@
 import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
 export interface MoveBackCollector {
-  [maLength: string]: {
+  [maLengthNumber: number]: {
     w: number
     s: number
   }
@@ -13,25 +13,21 @@ export interface CrossCollector {
 }
 
 export interface OscillatorCollector {
-  [oscilatorName: string]: {
+  [oscilatorNumber: number]: {
     w: number
     s: number
-    se: {
-      a: object,
-      s: object
-    }
   }
 }
 
 export interface CandleStickCollectorAnalysis {
   bullish: {
-    [name: string]: {
+    [bullishNumber: number]: {
       w: number
       s: number
     }
   }
   bearish: {
-    [name: string]: {
+    [bearishNumber: number]: {
       w: number
       s: number
     }
@@ -39,13 +35,21 @@ export interface CandleStickCollectorAnalysis {
 }
 
 export interface CandleStickCollector {
-  [depthLevel: number]: {
+  [depthLevelNumber: number]: {
     w: number
     a: CandleStickCollectorAnalysis
   }
 }
 
 export interface ScoresWeightsEntityV1Model {
+  names: {
+    oscillators: { [oscilatorName: string]: number }
+    candlesticks: {
+      bullish: { [bullishName: string]: number }
+      bearish: { [bearishName: string]: number }
+    }
+    moveBack: { [moveBackName: string]: number }
+  },
   pairs: {
     [pair: string]: {
       [interval: string]: {
@@ -78,7 +82,7 @@ export interface ScoresWeightsEntityV1Model {
     }
   }
   symbols: {
-    [symbol: string]:{
+    [symbol: string]: {
       news: {
         w: number
         s: number

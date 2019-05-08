@@ -2,9 +2,10 @@ import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
 import { addEVENWeight, addNAÏVEWeight, numShort } from '../../services/utils'
 import { CandleStickCollector, CandleStickCollectorAnalysis } from '../../entities/ScoresWeightsEntityV1'
+import { dataCollectorCandlestickNames } from './utils'
 
 const settings = {
-  depth: 50
+  depth: 10
 }
 
 const bullishArr = addEVENWeight([
@@ -59,7 +60,7 @@ const run = (data: StockData, dataCollector: CandleStickCollectorAnalysis) => {
   const analysis = {
     bullish: bullishArr.reduce((acc, [name, amount, weight], _, src) => {
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
-      dataCollector.bullish[name] = {
+      dataCollector.bullish[dataCollectorCandlestickNames.bullish[name]] = {
         w: numShort(weight),
         s: acc[name] ? 1 : 0
       }
@@ -74,7 +75,7 @@ const run = (data: StockData, dataCollector: CandleStickCollectorAnalysis) => {
     }),
     bearish: bearishArr.reduce((acc, [name, amount, weight], _, src) => {
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
-      dataCollector.bearish[name] = {
+      dataCollector.bearish[dataCollectorCandlestickNames.bearish[name]] = {
         w: numShort(weight),
         s: acc[name] ? 1 : 0
       }

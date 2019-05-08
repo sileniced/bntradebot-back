@@ -10,6 +10,7 @@ import Logger from '../Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { numShort } from '../../services/utils'
+import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
 
 export interface AssignedPair {
   pair: string,
@@ -84,7 +85,13 @@ class Analysis implements IAnalysis {
   private symbolTotals: { [pair: string]: number } = {}
   private allTotals: number = 0
 
-  public dataCollector: Partial<ScoresWeightsEntityV1Model> = {}
+  public dataCollector: Partial<ScoresWeightsEntityV1Model> = {
+    names: {
+      moveBack: dataCollectorMoveBackNames,
+      candlesticks: dataCollectorCandlestickNames,
+      oscillators: dataCollectorOscillatorNames
+    }
+  }
 
   constructor({ pairsInfo, getNormalizedSymbols }: AnalysisInput) {
 

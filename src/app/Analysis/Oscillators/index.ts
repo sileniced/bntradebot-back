@@ -4,6 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { addEVENWeight, addScores, numShort } from '../../../services/utils'
 import { OscillatorCollector } from '../../../entities/ScoresWeightsEntityV1'
+import { dataCollectorOscillatorNames } from '../utils'
 
 const oscillatorsList = addEVENWeight(Object.keys(settings).map(name => [name]))
 
@@ -14,10 +15,9 @@ export default (data: StockData, dataCollector: OscillatorCollector) => {
   const analysis = oscillatorsList.reduce((acc, [name, weight]) => {
     const score = scoring[name]()
 
-    dataCollector[name] = {
+    dataCollector[dataCollectorOscillatorNames[name]] = {
       w: numShort(weight),
-      s: numShort(score),
-      se: settings[name]
+      s: numShort(score)
     }
 
     acc[name] = {
