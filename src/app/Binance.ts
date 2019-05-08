@@ -18,8 +18,8 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
-import TradeBotEntity from '../entities/TradeBotEntity'
-import { Raw } from 'typeorm'
+// import TradeBotEntity from '../entities/TradeBotEntity'
+// import { Raw } from 'typeorm'
 
 export interface RealOrderResult {
   clientOrderId: string;
