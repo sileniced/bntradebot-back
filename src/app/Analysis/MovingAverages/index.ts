@@ -2,21 +2,32 @@ import StockData from 'technicalindicators/declarations/StockData'
 import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
-import { addNAÏVEWeight, addScores, numShort } from '../../../services/utils'
-import { CrossCollector, MoveBackCollector } from '../../../entities/ScoresWeightsEntityV1'
-import { dataCollectorMoveBackNames } from '../utils'
+import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsEntityV1'
+import { addScores, dataCollectorMoveBackNames } from '../utils'
+import { addCrossMlWeights, addNAIVEWeight, numShort } from '../mlWeightUtils'
 
 export default (
   data: StockData,
-  moveBackDataCollector: MoveBackCollector,
-  crossDataCollector: CrossCollector,
-  prevMoveBackData: MoveBackCollector,
-  prevCrossData: CrossCollector,
-  prevOptimalScore: number
+  moveBackDataCollector: MoveBackSW,
+  crossDataCollector: CrossSW,
+  prevMoveBackData: MoveBackSW,
+  // prevCrossData: CrossSW,
+  prevOptimalScore: number | null
 ) => {
 
-  const emaMovingAveragesList = addNAÏVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
-  const smaMovingAveragesList = addNAÏVEWeight(settings.SMA.periods.map(period => [`SMA${period}`]))
+  const emaMovingAveragesList: [string, number][] = prevOptimalScore !== null
+    ? addCrossMlWeights(prevOptimalScore, settings.EMA.periods.map(period => ({
+      name: `EMA${period}`,
+      prevData: prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
+    })))
+    : addNAIVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
+
+  const smaMovingAveragesList: [string, number][] = prevOptimalScore !== null
+    ? addCrossMlWeights(prevOptimalScore, settings.SMA.periods.map(period => ({
+      name: `SMA${period}`,
+      prevData: prevMoveBackData[dataCollectorMoveBackNames[`SMA${period}`]]
+    })))
+    : addNAIVEWeight(settings.SMA.periods.map(period => [`SMA${period}`]))
 
   const values = Values(data)
   const close = data.close.slice(-1)[0]
@@ -25,7 +36,7 @@ export default (
   const emaMoveBackAnalysis = emaMovingAveragesList.reduce((acc, [name, weight]) => {
     moveBackDataCollector[dataCollectorMoveBackNames[name]] = {
       w: numShort(weight),
-      s: numShort(scoring[name]._score)
+      s: scoring[name]._score
     }
     acc[name] = {
       _score: scoring[name]._score * weight
@@ -39,7 +50,7 @@ export default (
   const smaMoveBackAnalysis = smaMovingAveragesList.reduce((acc, [name, weight]) => {
     moveBackDataCollector[dataCollectorMoveBackNames[name]] = {
       w: numShort(weight),
-      s: numShort(scoring[name]._score)
+      s: scoring[name]._score
     }
     acc[name] = {
       _score: scoring[name]._score * weight

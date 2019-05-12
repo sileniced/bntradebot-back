@@ -1,8 +1,8 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
-import { addEVENWeight, addNAÏVEWeight, numShort } from '../../services/utils'
-import { CandleStickCollector, CandleStickCollectorAnalysis } from '../../entities/ScoresWeightsEntityV1'
+import { CandleStickCollector, CandleStickCollectorSW } from '../../entities/ScoresWeightsEntityV1'
 import { dataCollectorCandlestickNames } from './utils'
+import { addEVENWeight, addNAIVEWeight, numShort } from './mlWeightUtils'
 
 const settings = {
   depth: 10
@@ -49,7 +49,7 @@ const sliceStockData = (data: StockData, last: number): StockData => ({
   low: data.low.slice(-last)
 })
 
-const run = (data: StockData, dataCollector: CandleStickCollectorAnalysis) => {
+const run = (data: StockData, dataCollector: CandleStickCollectorSW) => {
   const dataLast = {
     [1]: sliceStockData(data, 1),
     [2]: sliceStockData(data, 2),
@@ -110,7 +110,7 @@ export default (data: StockData, dataCollector: CandleStickCollector) => {
   const length = data.close.length
 
   return {
-    _score: addNAÏVEWeight(Array(settings.depth).fill(null)
+    _score: addNAIVEWeight(Array(settings.depth).fill(null)
     .map((_, idx) => ([idx])))
     .reduce((acc, [level, weight]) => {
       dataCollector[level] = {

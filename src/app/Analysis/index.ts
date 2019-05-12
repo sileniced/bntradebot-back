@@ -9,8 +9,8 @@ import AnalysisNews from './NewsAnalysis'
 import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
-import { numShort } from '../../services/utils'
 import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
+import { numShort } from './mlWeightUtils'
 
 export interface AssignedPair {
   pair: string,
@@ -23,7 +23,7 @@ export interface AnalysisInput {
   pairsInfo: Symbol[]
   getNormalizedSymbols: () => { [symbol: string]: number }
   prevData: ScoresWeightsEntityV1Model | null
-  prevOptimalScore: { [pair: string]: number }
+  prevOptimalScore: { [pair: string]: number | null }
 }
 
 export interface MarketAnalysisResult {
@@ -96,7 +96,7 @@ class Analysis implements IAnalysis {
   }
 
   private prevData: ScoresWeightsEntityV1Model | null
-  private prevOptimalScore: { [pair: string]: number }
+  private prevOptimalScore: { [pair: string]: number | null }
 
   constructor({ pairsInfo, getNormalizedSymbols, prevData, prevOptimalScore }: AnalysisInput) {
 
@@ -206,7 +206,14 @@ class Analysis implements IAnalysis {
             const collector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech.a
             const prevData = this.prevData ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
 
-            const movingAverages = MovingAverages(candles, collector.moveBack.a, collector.cross, prevData.moveBack.a, prevData.cross, this.prevOptimalScore[pair])
+            const movingAverages = MovingAverages(
+              candles,
+              collector.moveBack.a,
+              collector.cross,
+              prevData.moveBack.a,
+              // prevData.cross,
+              this.prevOptimalScore[pair]
+            )
 
             this.techPairScore[pair] += (
               (Oscillators(candles, collector.oscillators.a)._score * this.techAnalysisWeights.oscillators)

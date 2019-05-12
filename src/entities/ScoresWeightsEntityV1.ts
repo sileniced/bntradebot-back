@@ -1,25 +1,25 @@
 import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
-export interface MoveBackCollector {
+export interface MoveBackSW {
   [maLengthNumber: number]: {
     w: number
     s: number
   }
 }
 
-export interface CrossCollector {
+export interface CrossSW {
   w: number
   s: number
 }
 
-export interface OscillatorCollector {
+export interface OscillatorSW {
   [oscilatorNumber: number]: {
     w: number
     s: number
   }
 }
 
-export interface CandleStickCollectorAnalysis {
+export interface CandleStickCollectorSW {
   bullish: {
     [bullishNumber: number]: {
       w: number
@@ -37,7 +37,7 @@ export interface CandleStickCollectorAnalysis {
 export interface CandleStickCollector {
   [depthLevelNumber: number]: {
     w: number
-    a: CandleStickCollectorAnalysis
+    a: CandleStickCollectorSW
   }
 }
 
@@ -60,7 +60,7 @@ export interface ScoresWeightsEntityV1Model {
             a: {
               oscillators: {
                 w: number
-                a: OscillatorCollector
+                a: OscillatorSW
               }
               candlesticks: {
                 w: number
@@ -68,9 +68,9 @@ export interface ScoresWeightsEntityV1Model {
               }
               moveBack: {
                 w: number
-                a: MoveBackCollector
+                a: MoveBackSW
               }
-              cross: CrossCollector
+              cross: CrossSW
               priceChange: {
                 w: number
                 s: number

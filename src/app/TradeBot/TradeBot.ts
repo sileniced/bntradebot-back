@@ -77,7 +77,7 @@ class TradeBot implements ITradeBot {
 
   private prevTradeBot: TradeBot
   private hasPrevTradeBot: boolean
-  private prevOptimalScore: { [pair: string]: number } = {}
+  private prevOptimalScore: { [pair: string]: number | null } = {}
 
   constructor(user: User, prevTradeBot: TradeBot) {
     this.user = user
@@ -126,7 +126,7 @@ class TradeBot implements ITradeBot {
           this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
         }
       } else {
-        this.prevOptimalScore[pair.symbol] = 0.5
+        this.prevOptimalScore[pair.symbol] = null
       }
     })))
 

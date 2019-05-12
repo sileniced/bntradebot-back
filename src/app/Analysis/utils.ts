@@ -56,3 +56,5 @@ export const dataCollectorOscillatorNames = {
   'MACD': 6,
   'WPR': 7
 }
+
+export const addScores = scores => Object.values(scores).reduce((acc, { _score }) => acc + _score, 0)

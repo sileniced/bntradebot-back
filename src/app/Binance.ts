@@ -18,7 +18,6 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
-import Analysis from './Analysis'
 // import TradeBotEntity from '../entities/TradeBotEntity'
 // import { Raw } from 'typeorm'
 

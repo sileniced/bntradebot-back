@@ -2,13 +2,13 @@ import StockData from 'technicalindicators/declarations/StockData'
 import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
-import { addEVENWeight, addScores, numShort } from '../../../services/utils'
-import { OscillatorCollector } from '../../../entities/ScoresWeightsEntityV1'
-import { dataCollectorOscillatorNames } from '../utils'
+import { OscillatorSW } from '../../../entities/ScoresWeightsEntityV1'
+import { addScores, dataCollectorOscillatorNames } from '../utils'
+import { addEVENWeight, numShort } from '../mlWeightUtils'
 
 const oscillatorsList = addEVENWeight(Object.keys(settings).map(name => [name]))
 
-export default (data: StockData, dataCollector: OscillatorCollector) => {
+export default (data: StockData, dataCollector: OscillatorSW) => {
   const values = Values(data)
   const scoring = Scoring(values)
 
