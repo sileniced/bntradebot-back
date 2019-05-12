@@ -22,6 +22,8 @@ export interface AssignedPair {
 export interface AnalysisInput {
   pairsInfo: Symbol[]
   getNormalizedSymbols: () => { [symbol: string]: number }
+  prevData: ScoresWeightsEntityV1Model | null
+  prevOptimalScore: { [pair: string]: number }
 }
 
 export interface MarketAnalysisResult {
@@ -63,7 +65,7 @@ class Analysis implements IAnalysis {
     crosses: 0.256,
     priceChange: 0.235
   }
-  private readonly symbolPieWeights = { tech: 0.4, news: 0.05, markets: 0.55 }
+  private readonly symbolPieWeights = { tech: 0.5, news: 0.05, markets: 0.45 }
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
@@ -93,7 +95,10 @@ class Analysis implements IAnalysis {
     }
   }
 
-  constructor({ pairsInfo, getNormalizedSymbols }: AnalysisInput) {
+  private prevData: ScoresWeightsEntityV1Model | null
+  private prevOptimalScore: { [pair: string]: number }
+
+  constructor({ pairsInfo, getNormalizedSymbols, prevData, prevOptimalScore }: AnalysisInput) {
 
     this.pairsInfo = pairsInfo
     this.pairs = pairsInfo.map(pair => pair.symbol)
@@ -141,6 +146,8 @@ class Analysis implements IAnalysis {
       return acc
     }, {})
 
+    this.prevData = prevData
+    this.prevOptimalScore = prevOptimalScore
   }
 
   public async run(logger: Logger): Promise<void> {
@@ -156,16 +163,17 @@ class Analysis implements IAnalysis {
     const pen = this.pairs.length
     const ien = this.intervalList.length
     for (let i = 0; i < pen; i++) {
+      const pair = this.pairs[i]
       this.dataCollector.pairs[this.pairs[i]] = {}
       for (let j = 0; j < ien; j++) {
 
-        techAnalysisPromises.push(Binance.getCandlesStockData(this.pairs[i], this.intervalList[j])
+        techAnalysisPromises.push(Binance.getCandlesStockData(pair, this.intervalList[j])
         .then((candles: StockData) => {
           if (this.dataCollector.pairs) {
 
             const priceChangeScore = PriceChangeAnalysis(candles)
 
-            this.dataCollector.pairs[this.pairs[i]][this.intervalList[j]] = {
+            this.dataCollector.pairs[pair][this.intervalList[j]] = {
               w: numShort(this.intervalWeights[j]),
               a: {
                 tech: {
@@ -195,11 +203,12 @@ class Analysis implements IAnalysis {
                 }
               }
             }
-            const collector = this.dataCollector.pairs[this.pairs[i]][this.intervalList[j]].a.tech.a
+            const collector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech.a
+            const prevData = this.prevData ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
 
-            const movingAverages = MovingAverages(candles, collector.moveBack.a, collector.cross)
+            const movingAverages = MovingAverages(candles, collector.moveBack.a, collector.cross, prevData.moveBack.a, prevData.cross, this.prevOptimalScore[pair])
 
-            this.techPairScore[this.pairs[i]] += (
+            this.techPairScore[pair] += (
               (Oscillators(candles, collector.oscillators.a)._score * this.techAnalysisWeights.oscillators)
               + (CandleStickAnalysis(candles, collector.candlesticks.a)._score * this.techAnalysisWeights.candlesticks)
               + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
@@ -257,16 +266,15 @@ class Analysis implements IAnalysis {
 
     for (let i = 0; i < qen; i++) {
       const quoteSymbol = this.marketSymbols[i]
-      this.pairsPerSymbol[quoteSymbol]
-      .filter(pair => this.marketSymbols.includes(pair.baseAsset) && pair.quoteAsset === quoteSymbol)
-      .forEach(pair => {
+      this.pairsPerSymbol[quoteSymbol].forEach(pair => {
+        if (this.marketSymbols.includes(pair.baseAsset) && pair.quoteAsset === quoteSymbol) {
+          this.marketScore[pair.baseAsset].battleScore = this.marketScore[pair.baseAsset].poweredScore
+          this.marketScore[pair.quoteAsset].battleScore = this.marketScore[pair.quoteAsset].poweredScore
 
-        this.marketScore[pair.baseAsset].battleScore = this.marketScore[pair.baseAsset].poweredScore
-        this.marketScore[pair.quoteAsset].battleScore = this.marketScore[pair.quoteAsset].poweredScore
-
-        const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
-        this.marketScore[pair.baseAsset].battleScore += baseTechScore
-        this.marketScore[pair.quoteAsset].battleScore -= baseTechScore
+          const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
+          this.marketScore[pair.baseAsset].battleScore += baseTechScore
+          this.marketScore[pair.quoteAsset].battleScore -= baseTechScore
+        }
       })
     }
 

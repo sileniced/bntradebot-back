@@ -18,6 +18,7 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
+import Analysis from './Analysis'
 // import TradeBotEntity from '../entities/TradeBotEntity'
 // import { Raw } from 'typeorm'
 
@@ -56,13 +57,19 @@ class BinanceApi {
     globalTradeInterval: 1000 * 60 * 10
   }
 
+  private prevTradeBot: { [userId: number]: TradeBot } = {}
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
 
     this.activeTradeBotUserIds.forEach(id => {
-      new TradeBot(this.activeTradeBotUsers[id]).run()
+
+      this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
+      this.prevTradeBot[id].run()
+      .catch(console.error)
     })
+
+
 
     // TradeBotEntity.find({
     //   relations: ['scoresWeightsV1'],

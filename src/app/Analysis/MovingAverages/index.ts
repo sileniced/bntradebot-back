@@ -6,10 +6,18 @@ import { addNAÏVEWeight, addScores, numShort } from '../../../services/utils'
 import { CrossCollector, MoveBackCollector } from '../../../entities/ScoresWeightsEntityV1'
 import { dataCollectorMoveBackNames } from '../utils'
 
-const emaMovingAveragesList = addNAÏVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
-const smaMovingAveragesList = addNAÏVEWeight(settings.SMA.periods.map(period => [`SMA${period}`]))
+export default (
+  data: StockData,
+  moveBackDataCollector: MoveBackCollector,
+  crossDataCollector: CrossCollector,
+  prevMoveBackData: MoveBackCollector,
+  prevCrossData: CrossCollector,
+  prevOptimalScore: number
+) => {
 
-export default (data: StockData, moveBackDataCollector: MoveBackCollector, crossDataCollector: CrossCollector) => {
+  const emaMovingAveragesList = addNAÏVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
+  const smaMovingAveragesList = addNAÏVEWeight(settings.SMA.periods.map(period => [`SMA${period}`]))
+
   const values = Values(data)
   const close = data.close.slice(-1)[0]
   const scoring = Scoring(close, values)
