@@ -204,7 +204,7 @@ class Analysis implements IAnalysis {
             }
             const collector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech.a
             const prevData = this.prevOptimalScore[pair] ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
-            const optimalScore = this.prevOptimalScore[pair]
+            const prevOptimalScore = this.prevOptimalScore[pair]
 
             const movingAverages = MovingAverages(
               candles,
@@ -212,7 +212,7 @@ class Analysis implements IAnalysis {
               collector.cross,
               prevData.moveBack.a,
               // prevData.cross,
-              optimalScore
+              prevOptimalScore
             )
 
             this.techPairScore[pair] += (
@@ -220,9 +220,14 @@ class Analysis implements IAnalysis {
                 candles,
                 collector.oscillators.a,
                 prevData.oscillators.a,
-                optimalScore
+                prevOptimalScore
               )._score * this.techAnalysisWeights.oscillators)
-              + (CandleStickAnalysis(candles, collector.candlesticks.a)._score * this.techAnalysisWeights.candlesticks)
+              + (CandleStickAnalysis(
+                candles,
+                collector.candlesticks.a,
+                prevData.candlesticks.a,
+                prevOptimalScore
+              )._score * this.techAnalysisWeights.candlesticks)
               + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
               + (movingAverages.crossScore * this.techAnalysisWeights.crosses)
               + (priceChangeScore * this.techAnalysisWeights.priceChange)

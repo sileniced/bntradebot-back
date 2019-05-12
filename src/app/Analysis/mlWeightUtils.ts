@@ -8,9 +8,11 @@ export const calcWeight = (prevScore, prevWeight, prevOptimalScore) => prevWeigh
       )
     ) - prevWeight
   ) * (
-    prevOptimalScore > 0.5
-      ? (prevOptimalScore - 0.5) / 6 // magic number 6 = how many 10m in 1h
-      : (0.5 - prevOptimalScore) / 6
+    (
+      prevOptimalScore > 0.5
+        ? (prevOptimalScore - 0.5)
+        : (0.5 - prevOptimalScore)
+    ) / 2
   )
 )
 
@@ -39,7 +41,7 @@ export const addMachineLearningWeights = (
 
   const artifact = newWeights.map(([name, weight]) => [name, weight / total])
 
-  console.table(periodsArr.map((period, idx) => ({
+  Math.random() > 0.985 && console.table(periodsArr.map((period, idx) => ({
     name: period.name,
     prevOptimalScore,
     score: period.prevData.s,

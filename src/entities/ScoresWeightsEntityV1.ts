@@ -19,7 +19,7 @@ export interface OscillatorSW {
   }
 }
 
-export interface CandleStickCollectorSW {
+export interface CandleStickSW {
   bullish: {
     [bullishNumber: number]: {
       w: number
@@ -34,10 +34,10 @@ export interface CandleStickCollectorSW {
   }
 }
 
-export interface CandleStickCollector {
+export interface CandleStickData {
   [depthLevelNumber: number]: {
     w: number
-    a: CandleStickCollectorSW
+    a: CandleStickSW
   }
 }
 
@@ -64,7 +64,7 @@ export interface ScoresWeightsEntityV1Model {
               }
               candlesticks: {
                 w: number
-                a: CandleStickCollector
+                a: CandleStickData
               }
               moveBack: {
                 w: number
