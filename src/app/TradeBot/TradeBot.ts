@@ -7,6 +7,11 @@ import Logger from '../../services/Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
 import ScoresWeightsEntityV1, { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
+import {
+  dataCollectorCandlestickNames,
+  dataCollectorMoveBackNames,
+  dataCollectorOscillatorNames
+} from '../Analysis/utils'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -57,7 +62,7 @@ class TradeBot implements ITradeBot {
   private entity: TradeBotEntity
 
   // todo: get from user database ('USDT' required)
-  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC']
+  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB'/*, 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC'*/]
   protected pairsInfo: Symbol[] = []
 
   private balance: { [pair: string]: number } = {}
@@ -138,8 +143,17 @@ class TradeBot implements ITradeBot {
     this.analysis = new Analysis({
       pairsInfo: this.pairsInfo,
       getNormalizedSymbols: this.getNormalizedSymbols,
-      prevData: this.prevTradeBot.analysis.dataCollector as ScoresWeightsEntityV1Model,
-      prevOptimalScore: this.prevOptimalScore
+      prevOptimalScore: this.prevOptimalScore,
+      prevData: (this.prevTradeBot ? this.prevTradeBot.analysis.dataCollector : {
+        symbols: {},
+        pairs: {},
+        names: {
+          moveBack: dataCollectorMoveBackNames,
+          candlesticks: dataCollectorCandlestickNames,
+          oscillators: dataCollectorOscillatorNames
+        },
+        market: {}
+      }) as ScoresWeightsEntityV1Model
     })
     const analysisPromise = this.analysis.run(logger)
 
@@ -181,7 +195,7 @@ class TradeBot implements ITradeBot {
     const addToFinalPairs = (pair: Trade) => {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
-      this.tradePromises.push(Binance.newOrder(this.user, pair.feeDollar, {
+      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),

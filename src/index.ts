@@ -75,7 +75,7 @@ setupDb().then(() => {
     console.log(`Listening on port ${port}`)
 
     Binance.getTime().then(time => {
-      // Binance.startAutoTradeBots()
+      Binance.startAutoTradeBots()
       console!.log(`Binance time diff: ${time - Date.now()}ms`)
     })
   })

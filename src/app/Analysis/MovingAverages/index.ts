@@ -4,7 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsEntityV1'
 import { addScores, dataCollectorMoveBackNames } from '../utils'
-import { addCrossMlWeights, addNAIVEWeight, numShort } from '../mlWeightUtils'
+import { addMachineLearningWeights, addNAIVEWeight } from '../mlWeightUtils'
 
 export default (
   data: StockData,
@@ -16,14 +16,14 @@ export default (
 ) => {
 
   const emaMovingAveragesList: [string, number][] = prevOptimalScore !== null
-    ? addCrossMlWeights(prevOptimalScore, settings.EMA.periods.map(period => ({
+    ? addMachineLearningWeights(prevOptimalScore, settings.EMA.periods.map(period => ({
       name: `EMA${period}`,
       prevData: prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
     })))
     : addNAIVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
 
   const smaMovingAveragesList: [string, number][] = prevOptimalScore !== null
-    ? addCrossMlWeights(prevOptimalScore, settings.SMA.periods.map(period => ({
+    ? addMachineLearningWeights(prevOptimalScore, settings.SMA.periods.map(period => ({
       name: `SMA${period}`,
       prevData: prevMoveBackData[dataCollectorMoveBackNames[`SMA${period}`]]
     })))
@@ -35,7 +35,7 @@ export default (
 
   const emaMoveBackAnalysis = emaMovingAveragesList.reduce((acc, [name, weight]) => {
     moveBackDataCollector[dataCollectorMoveBackNames[name]] = {
-      w: numShort(weight),
+      w: weight,
       s: scoring[name]._score
     }
     acc[name] = {
@@ -49,7 +49,7 @@ export default (
 
   const smaMoveBackAnalysis = smaMovingAveragesList.reduce((acc, [name, weight]) => {
     moveBackDataCollector[dataCollectorMoveBackNames[name]] = {
-      w: numShort(weight),
+      w: weight,
       s: scoring[name]._score
     }
     acc[name] = {
@@ -79,7 +79,7 @@ export default (
   }, 0)
 
   const crossScore = ((emaCrossAnalysis / maxScore) + (smaCrossAnalysis / maxScore)) / 2
-  crossDataCollector.s = numShort(crossScore)
+  crossDataCollector.s = crossScore
 
   return {
     moveBackScore: (addScores(emaMoveBackAnalysis) + addScores(smaMoveBackAnalysis)) / 2,

@@ -52,9 +52,9 @@ class BinanceApi {
 
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
-  private readonly settings = {
-    globalTradeInterval: 1000 * 60 * 10
-  }
+  // private readonly settings = {
+  //   globalTradeInterval: 1000 * 60 * 10
+  // }
 
   private prevTradeBot: { [userId: number]: TradeBot } = {}
   private activeTradeBotUserIds: number[] = []
@@ -95,7 +95,7 @@ class BinanceApi {
       })
 
       if (startNow) this.tradeBotExecute()
-      setInterval(this.tradeBotExecute, this.settings.globalTradeInterval)
+      setInterval(this.tradeBotExecute, /*this.settings.globalTradeInterval*/ 1000 * 10)
     })
   }
 

@@ -1,6 +1,3 @@
-export const numShort = num => Math.round(num * 100000)
-export const numBig = num => num / 100000
-
 export const calcWeight = (prevScore, prevWeight, prevOptimalScore) => prevWeight + (
   (
     (
@@ -12,12 +9,12 @@ export const calcWeight = (prevScore, prevWeight, prevOptimalScore) => prevWeigh
     ) - prevWeight
   ) * (
     prevOptimalScore > 0.5
-      ? (prevOptimalScore - 0.5) / 2
-      : (0.5 - prevOptimalScore) / 2
+      ? (prevOptimalScore - 0.5) / 6 // magic number 6 = how many 10m in 1h
+      : (0.5 - prevOptimalScore) / 6
   )
 )
 
-export const addCrossMlWeights = (
+export const addMachineLearningWeights = (
   prevOptimalScore: number,
   periodsArr: {
     name: string,
@@ -27,11 +24,12 @@ export const addCrossMlWeights = (
     }
   }[]
 ) => {
+
   let total = 0
   const newWeights = periodsArr.map(period => {
     const newWeight = calcWeight(
       period.prevData.s,
-      numBig(period.prevData.w),
+      period.prevData.w,
       prevOptimalScore
     )
 
@@ -39,7 +37,18 @@ export const addCrossMlWeights = (
     return [period.name, newWeight]
   })
 
-  return newWeights.map(([name, weight]) => [name, weight / total])
+  const artifact = newWeights.map(([name, weight]) => [name, weight / total])
+
+  console.table(periodsArr.map((period, idx) => ({
+    name: period.name,
+    prevOptimalScore,
+    score: period.prevData.s,
+    weight: period.prevData.w,
+    newWeight: artifact[idx][1],
+    diff: artifact[idx][1] - period.prevData.w
+  })))
+
+  return artifact
 }
 
 export const addNAIVEWeight = arr => {

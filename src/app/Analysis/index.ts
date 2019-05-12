@@ -10,7 +10,6 @@ import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
-import { numShort } from './mlWeightUtils'
 
 export interface AssignedPair {
   pair: string,
@@ -22,8 +21,8 @@ export interface AssignedPair {
 export interface AnalysisInput {
   pairsInfo: Symbol[]
   getNormalizedSymbols: () => { [symbol: string]: number }
-  prevData: ScoresWeightsEntityV1Model | null
   prevOptimalScore: { [pair: string]: number | null }
+  prevData: ScoresWeightsEntityV1Model
 }
 
 export interface MarketAnalysisResult {
@@ -95,7 +94,7 @@ class Analysis implements IAnalysis {
     }
   }
 
-  private prevData: ScoresWeightsEntityV1Model | null
+  private prevData: ScoresWeightsEntityV1Model
   private prevOptimalScore: { [pair: string]: number | null }
 
   constructor({ pairsInfo, getNormalizedSymbols, prevData, prevOptimalScore }: AnalysisInput) {
@@ -174,37 +173,38 @@ class Analysis implements IAnalysis {
             const priceChangeScore = PriceChangeAnalysis(candles)
 
             this.dataCollector.pairs[pair][this.intervalList[j]] = {
-              w: numShort(this.intervalWeights[j]),
+              w: this.intervalWeights[j],
               a: {
                 tech: {
-                  w: numShort(this.symbolPieWeights.tech),
+                  w: this.symbolPieWeights.tech,
                   a: {
                     oscillators: {
-                      w: numShort(this.techAnalysisWeights.oscillators),
+                      w: this.techAnalysisWeights.oscillators,
                       a: {}
                     },
                     candlesticks: {
-                      w: numShort(this.techAnalysisWeights.candlesticks),
+                      w: this.techAnalysisWeights.candlesticks,
                       a: {}
                     },
                     moveBack: {
-                      w: numShort(this.techAnalysisWeights.moveBack),
+                      w: this.techAnalysisWeights.moveBack,
                       a: {}
                     },
                     cross: {
-                      w: numShort(this.techAnalysisWeights.crosses),
+                      w: this.techAnalysisWeights.crosses,
                       s: 0
                     },
                     priceChange: {
-                      w: numShort(this.techAnalysisWeights.priceChange),
-                      s: numShort(priceChangeScore)
+                      w: this.techAnalysisWeights.priceChange,
+                      s: priceChangeScore
                     }
                   }
                 }
               }
             }
             const collector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech.a
-            const prevData = this.prevData ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
+            const prevData = this.prevOptimalScore[pair] ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
+            const optimalScore = this.prevOptimalScore[pair]
 
             const movingAverages = MovingAverages(
               candles,
@@ -212,11 +212,16 @@ class Analysis implements IAnalysis {
               collector.cross,
               prevData.moveBack.a,
               // prevData.cross,
-              this.prevOptimalScore[pair]
+              optimalScore
             )
 
             this.techPairScore[pair] += (
-              (Oscillators(candles, collector.oscillators.a)._score * this.techAnalysisWeights.oscillators)
+              (Oscillators(
+                candles,
+                collector.oscillators.a,
+                prevData.oscillators.a,
+                optimalScore
+              )._score * this.techAnalysisWeights.oscillators)
               + (CandleStickAnalysis(candles, collector.candlesticks.a)._score * this.techAnalysisWeights.candlesticks)
               + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
               + (movingAverages.crossScore * this.techAnalysisWeights.crosses)
@@ -246,11 +251,11 @@ class Analysis implements IAnalysis {
       }, [0, 0])
 
       /**
-      todo: HIER MOET NOG IETS: de quote symbols need to battle it out
+       todo: HIER MOET NOG IETS: de quote symbols need to battle it out
 
-      Als market1 het sterker doet dan market2,
-      en een symbol wordt vergeleken met market2,
-      moet het eerst kijken naar market1.
+       Als market1 het sterker doet dan market2,
+       en een symbol wordt vergeleken met market2,
+       moet het eerst kijken naar market1.
        */
 
       const quoteMultiplier = Math.sqrt(quoteScore)
@@ -345,15 +350,15 @@ class Analysis implements IAnalysis {
       const newsScore = this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]
       this.dataCollector.symbols[symbol] = {
         news: {
-          w: numShort(this.symbolPieWeights.news),
-          s: numShort(newsScore)
+          w: this.symbolPieWeights.news,
+          s: newsScore
         }
       }
 
       const marketSymbol = this.marketSymbols.includes(symbol) ? symbol : 'ALTS'
       this.dataCollector.market[marketSymbol] = {
-        w: numShort(this.symbolPieWeights.markets),
-        s: numShort(this.marketScore[marketSymbol].battleScore)
+        w: this.symbolPieWeights.markets,
+        s: this.marketScore[marketSymbol].battleScore
       }
 
       this.symbolTotals[symbol] += this.marketScore[marketSymbol].battleScore * this.symbolPieWeights.markets
