@@ -42,6 +42,41 @@ export interface CandleStickData {
   }
 }
 
+export interface IntervalData {
+  [interval: string]: {
+    w: number
+    s: number
+    a: {
+      tech: {
+        w: number
+        s: number
+        a: {
+          oscillators: {
+            w: number
+            s: number
+            a: OscillatorSW
+          }
+          candlesticks: {
+            w: number
+            s: number
+            a: CandleStickData
+          }
+          moveBack: {
+            w: number
+            s: number
+            a: MoveBackSW
+          }
+          cross: CrossSW
+          priceChange: {
+            w: number
+            s: number
+          }
+        }
+      }
+    }
+  }
+}
+
 export interface ScoresWeightsEntityV1Model {
   names: {
     oscillators: { [oscilatorName: string]: number }
@@ -53,38 +88,9 @@ export interface ScoresWeightsEntityV1Model {
   },
   pairs: {
     [pair: string]: {
-      [interval: string]: {
-        w: number
-        s: number
-        a: {
-          tech: {
-            w: number
-            s: number
-            a: {
-              oscillators: {
-                w: number
-                s: number
-                a: OscillatorSW
-              }
-              candlesticks: {
-                w: number
-                s: number
-                a: CandleStickData
-              }
-              moveBack: {
-                w: number
-                s: number
-                a: MoveBackSW
-              }
-              cross: CrossSW
-              priceChange: {
-                w: number
-                s: number
-              }
-            }
-          }
-        }
-      }
+      o: number,
+      s: number
+      a: IntervalData
     }
   }
   symbols: {

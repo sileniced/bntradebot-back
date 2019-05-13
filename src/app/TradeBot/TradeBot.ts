@@ -237,6 +237,7 @@ class TradeBot implements ITradeBot {
 
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore
+    this.entity.prevOptimalScorePair = this.analysis.prevOptimalScore
     this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
       acc[market] = this.analysis.marketScore[market].score

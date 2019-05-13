@@ -1,7 +1,7 @@
 import binance, {
   AssetBalance,
   AvgPriceResult,
-  Binance,
+  Binance, CandleChartInterval,
   CandleChartResult,
   ExchangeInfo,
   NewOrder,
@@ -126,10 +126,10 @@ class BinanceApi {
     return error
   })
 
-  public getCandlesStockData = (symbol, interval): Promise<StockData> => this.api.candles({
+  public getCandlesStockData = (symbol, interval: CandleChartInterval, limit = 200): Promise<StockData> => this.api.candles({
     symbol,
     interval,
-    limit: 200
+    limit
   })
   .then(candles => CreateTechAnalysisData(candles))
   .catch(error => {

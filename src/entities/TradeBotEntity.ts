@@ -91,6 +91,9 @@ class TradeBotEntity extends BaseEntity {
   @Column('simple-array')
   private _balancePostTradeSymbols: string[]
 
+  @Column('simple-array', { nullable: true })
+  private _prevOptimalScorePair: string[]
+
   get pricesPairs(): { [pair: string]: number } {
     return this.pairs.reduce((acc, pair, idx) => {
       acc[pair] = parseFloat(this._pricesPairs[idx])
@@ -194,6 +197,17 @@ class TradeBotEntity extends BaseEntity {
 
   set balancePostTradeSymbols(symbols: { [symbol: string]: number }) {
     this._balancePostTradeSymbols = this.symbols.map(symbol => symbols[symbol].toString())
+  }
+
+  get prevOptimalScorePair(): { [pair: string]: number } {
+    return this.pairs.reduce((acc, pair, idx) => {
+      acc[pair] = parseFloat(this._prevOptimalScorePair[idx])
+      return acc
+    }, {})
+  }
+
+  set prevOptimalScorePair(pairs: { [pair: string]: number }) {
+    this._prevOptimalScorePair = this.pairs.map(pair => pairs[pair].toString())
   }
 }
 
