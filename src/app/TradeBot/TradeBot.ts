@@ -62,7 +62,7 @@ class TradeBot implements ITradeBot {
   private entity: TradeBotEntity
 
   // todo: get from user database ('USDT' required)
-  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC']
+  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB'/*, 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC'*/]
   protected pairsInfo: Symbol[] = []
 
   private balance: { [pair: string]: number } = {}
@@ -195,7 +195,8 @@ class TradeBot implements ITradeBot {
     const addToFinalPairs = (pair: Trade) => {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
-      this.tradePromises.push(Binance.newOrder(this.user, pair.feeDollar, {
+                                        /** DEV HERE*/
+      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),

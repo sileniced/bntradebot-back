@@ -2,7 +2,7 @@ import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
 import { CandleStickData, CandleStickSW } from '../../entities/ScoresWeightsEntityV1'
 import { dataCollectorCandlestickNames } from './utils'
-import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight } from './mlWeightUtils'
+import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from './mlWeightUtils'
 
 const settings = {
   depth: 10
@@ -49,6 +49,9 @@ const sliceStockData = (data: StockData, last: number): StockData => ({
   low: data.low.slice(-last)
 })
 
+const sigmoid = (count, length) => (2 - ((2 * count) / length))
+const calcScore = (bullish, bearish) => 0.5 + (bullish / 2) - (bearish / 2)
+
 const run = (
   data: StockData,
   dataCollector: CandleStickSW,
@@ -82,9 +85,9 @@ const run = (
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
       dataCollector.bullish[dataCollectorCandlestickNames.bullish[name]] = {
         w: weight,
-        s: acc[name] ? 0.75 : 0.25
+        s: acc[name] ? 0.51 : 0
       }
-      acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
+      acc._score += acc[name] ? weight * sigmoid(acc._count, src.length) : 0
       acc._unSigmoidScore += acc[name] ? weight : 0
       acc._count += acc[name] ? 1 : 0
       return acc
@@ -97,9 +100,9 @@ const run = (
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
       dataCollector.bearish[dataCollectorCandlestickNames.bearish[name]] = {
         w: weight,
-        s: acc[name] ? 0.75 : 0.25
+        s: acc[name] ? 0.51 : 0
       }
-      acc._score += acc[name] ? weight * (2 - ((2 * acc._count) / src.length)) : 0
+      acc._score += acc[name] ? weight * sigmoid(acc._count, src.length) : 0
       acc._unSigmoidScore += acc[name] ? weight : 0
       acc._count += acc[name] ? 1 : 0
       return acc
@@ -110,7 +113,7 @@ const run = (
     })
   }
 
-  const score = 0.5 + (analysis.bullish._score / 2) - (analysis.bearish._score / 2)
+  const score = calcScore(analysis.bullish._score, analysis.bearish._score)
 
   return {
     _score: score
@@ -154,7 +157,56 @@ export default (
 
   /** OLD SCORES NEW WEIGHTS */
 
+  if (prevOptimalScore !== null) {
 
+    const prevDataEntries = Object.entries(prevData) as [string, {
+      w: number
+      /** trick is to turn that :a: into an :s: */
+      a: CandleStickSW
+    }][]
+
+    const machineLearningData: MachineLearningData[] = prevDataEntries.map(([level, { w, a: { bullish, bearish } }]) => {
+      const bullishEntries = Object.entries(bullish) as [string, { w: number, s: number }][]
+      const bullishReduced = bullishEntries.reduce((acc, [bullishNumber, { s }]) => {
+        acc.score += s > 0.5 ? dataCollector[level].a.bullish[bullishNumber].w * sigmoid(acc.count, bullishEntries.length) : 0
+        acc.count += s > 0.5 ? 1 : 0
+        return acc
+      }, {
+        score: 0,
+        count: 0
+      })
+
+      const bearishEntries = Object.entries(bearish) as [string, { w: number, s: number }][]
+      const bearishReduced = bearishEntries.reduce((acc, [bearishNumber, { s }]) => {
+        acc.score += s > 0.5 ? dataCollector[level].a.bearish[bearishNumber].w * sigmoid(acc.count, bearishEntries.length) : 0
+        acc.count += s > 0.5 ? 1 : 0
+        return acc
+      }, {
+        score: 0,
+        count: 0
+      })
+      
+      const score = calcScore(bullishReduced.score, bearishReduced.score)
+      
+      return {
+        name: level,
+        prevData: {
+          w,
+          s: score
+        }
+      }
+    })
+
+    const levelArrWeighted: [string, number][] = addMachineLearningWeights(prevOptimalScore, machineLearningData, true)
+
+    return {
+      _score: levelArrWeighted.reduce((acc, [level, weight]) => {
+        dataCollector[level].w = weight
+        return acc + (leverArrScore[level] * weight)
+      }, 0)
+    }
+
+  }
 
   const levelArrWeighted: [number, number][] = addNAIVEWeight(levelArr)
 

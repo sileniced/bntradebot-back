@@ -12,20 +12,23 @@ export const calcWeight = (prevScore, prevWeight, prevOptimalScore) => prevWeigh
       prevOptimalScore > 0.5
         ? (prevOptimalScore - 0.5)
         : (0.5 - prevOptimalScore)
-    ) / 2
+    ) * 2
   )
 )
 
+export interface MachineLearningData {
+  name: string,
+  prevData: {
+    w: number
+    s: number
+  }
+}
+
 export const addMachineLearningWeights = (
   prevOptimalScore: number,
-  periodsArr: {
-    name: string,
-    prevData: {
-      w: number
-      s: number
-    }
-  }[]
-) => {
+  periodsArr: MachineLearningData[],
+  log: Boolean = false
+): [string, number][] => {
 
   let total = 0
   const newWeights = periodsArr.map(period => {
@@ -39,9 +42,9 @@ export const addMachineLearningWeights = (
     return [period.name, newWeight]
   })
 
-  const artifact = newWeights.map(([name, weight]) => [name, weight / total])
+  const artifact: [string, number][] = newWeights.map(([name, weight]) => [name, weight / total])
 
-  Math.random() > 0.985 && console.table(periodsArr.map((period, idx) => ({
+  log && Math.random() > 0.1 && console.table(periodsArr.map((period, idx) => ({
     name: period.name,
     prevOptimalScore,
     score: period.prevData.s,

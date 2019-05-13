@@ -255,14 +255,6 @@ class Analysis implements IAnalysis {
           : [acc[0], acc[1] + quoteScore / src.length]
       }, [0, 0])
 
-      /**
-       todo: HIER MOET NOG IETS: de quote symbols need to battle it out
-
-       Als market1 het sterker doet dan market2,
-       en een symbol wordt vergeleken met market2,
-       moet het eerst kijken naar market1.
-       */
-
       const quoteMultiplier = Math.sqrt(quoteScore)
       const baseMultiplier = Math.sqrt(baseScore)
 
