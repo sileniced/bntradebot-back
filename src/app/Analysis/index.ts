@@ -161,11 +161,12 @@ class Analysis implements IAnalysis {
 
     this.dataCollector.pairs = {}
 
-    const techAnalysisPromises: Promise<void>[] = []
 
-    /** this.techPairScore[pair] = */
+    const prevOptimalSMAScorePromises: Promise<void>[] = []
+
+    /** this.prevOptimalScore[pair] = */
     this.pairs.forEach(pair => {
-      Binance.getCandlesStockData(pair, '5m', 15)
+      prevOptimalSMAScorePromises.push(Binance.getCandlesStockData(pair, '5m', 15)
       .then((candles: StockData) => {
         const [previous, current] = SMA.calculate({
           values: candles.close,
@@ -207,98 +208,104 @@ class Analysis implements IAnalysis {
           this.intervalWeights[pair] = this.initIntervalWeights
           this.prevOptimalScore[pair] = this.prevOptimalSMAScore[pair]
         }
+      }))
+    })
 
-        this.intervalList.forEach((interval, intervalIdx) => {
-          techAnalysisPromises.push(Binance.getCandlesStockData(pair, interval)
-          .then((candles: StockData) => {
-            if (!this.dataCollector.pairs) return
-            this.dataCollector.pairs[pair].a[interval] = {
-              w: 0, s: 0, a: {
-                tech: {
-                  w: this.symbolPieWeights.tech, s: 0, a: {
-                    oscillators: { w: 0, s: 0, a: {} },
-                    candlesticks: { w: 0, s: 0, a: {} },
-                    moveBack: { w: 0, s: 0, a: {} },
-                    cross: { w: 0, s: 0 },
-                    priceChange: { w: 0, s: 0 }
-                  }
+    await Promise.all(prevOptimalSMAScorePromises)
+
+    const techAnalysisPromises: Promise<void>[] = []
+
+    /** this.techPairScore[pair] = */
+    this.pairs.forEach(pair => {
+      this.intervalList.forEach((interval, intervalIdx) => {
+        techAnalysisPromises.push(Binance.getCandlesStockData(pair, interval)
+        .then((candles: StockData) => {
+          if (!this.dataCollector.pairs) return
+          this.dataCollector.pairs[pair].a[interval] = {
+            w: 0, s: 0, a: {
+              tech: {
+                w: this.symbolPieWeights.tech, s: 0, a: {
+                  oscillators: { w: 0, s: 0, a: {} },
+                  candlesticks: { w: 0, s: 0, a: {} },
+                  moveBack: { w: 0, s: 0, a: {} },
+                  cross: { w: 0, s: 0 },
+                  priceChange: { w: 0, s: 0 }
                 }
               }
             }
+          }
 
-            const intervalCollector = this.dataCollector.pairs[pair].a[interval]
-            const techCollector = intervalCollector.a.tech
-            const collector = techCollector.a
+          const intervalCollector = this.dataCollector.pairs[pair].a[interval]
+          const techCollector = intervalCollector.a.tech
+          const collector = techCollector.a
 
-            const prevOptimalPriceChangeScore: number | null = this.prevOptimalPriceChangeScore[pair]
-            const prevOptimalScore: number | null = prevOptimalPriceChangeScore !== null ? (prevOptimalPriceChangeScore * 0.2) + (this.prevOptimalSMAScore[pair] * 0.8) : null
-            const prevData = prevOptimalScore ? this.prevData.pairs[pair].a[interval].a.tech.a : collector
+          const prevOptimalPriceChangeScore: number | null = this.prevOptimalPriceChangeScore[pair]
+          const prevOptimalScore: number | null = prevOptimalPriceChangeScore !== null ? (prevOptimalPriceChangeScore * 0.2) + (this.prevOptimalSMAScore[pair] * 0.8) : null
+          const prevData = prevOptimalScore ? this.prevData.pairs[pair].a[interval].a.tech.a : collector
 
-            const { crossScore: cross, moveBackScore: moveBack } = MovingAverages(
-              candles,
-              collector.moveBack.a,
-              collector.cross,
-              prevData.moveBack.a,
-              // prevData.cross,
-              prevOptimalScore
-            )
+          const { crossScore: cross, moveBackScore: moveBack } = MovingAverages(
+            candles,
+            collector.moveBack.a,
+            collector.cross,
+            prevData.moveBack.a,
+            // prevData.cross,
+            prevOptimalScore
+          )
 
-            const oscillators = Oscillators(
-              candles,
-              collector.oscillators.a,
-              prevData.oscillators.a,
-              prevOptimalScore
-            )._score
+          const oscillators = Oscillators(
+            candles,
+            collector.oscillators.a,
+            prevData.oscillators.a,
+            prevOptimalScore
+          )._score
 
-            const candlesticks = CandleStickAnalysis(
-              candles,
-              collector.candlesticks.a,
-              prevData.candlesticks.a,
-              prevOptimalScore
-            )._score
+          const candlesticks = CandleStickAnalysis(
+            candles,
+            collector.candlesticks.a,
+            prevData.candlesticks.a,
+            prevOptimalScore
+          )._score
 
-            const priceChange = PriceChangeAnalysis(candles)
+          const priceChange = PriceChangeAnalysis(candles)
 
-            collector.moveBack.s = moveBack
-            collector.oscillators.s = oscillators
-            collector.candlesticks.s = candlesticks
-            collector.priceChange.s = priceChange
+          collector.moveBack.s = moveBack
+          collector.oscillators.s = oscillators
+          collector.candlesticks.s = candlesticks
+          collector.priceChange.s = priceChange
 
-            const weights = prevOptimalScore !== null
-              ? addMachineLearningWeights(
-                prevOptimalScore,
-                Object.entries(prevData).map(([name, { s, w }]) => ({ name, prevData: { s, w } }))
-              ).reduce((acc, [name, weight]) => {
-                acc[name] = weight
-                return acc
-              }, {})
-              : this.initTechAnalysisWeights
+          const weights = prevOptimalScore !== null
+            ? addMachineLearningWeights(
+              prevOptimalScore,
+              Object.entries(prevData).map(([name, { s, w }]) => ({ name, prevData: { s, w } }))
+            ).reduce((acc, [name, weight]) => {
+              acc[name] = weight
+              return acc
+            }, {})
+            : this.initTechAnalysisWeights
 
-            const techScore = (
-              (oscillators * weights['oscillators'])
-              + (candlesticks * weights['candlesticks'])
-              + (moveBack * weights['moveBack'])
-              + (cross * weights['cross'])
-              + (priceChange * weights['priceChange'])
-            )
+          const techScore = (
+            (oscillators * weights['oscillators'])
+            + (candlesticks * weights['candlesticks'])
+            + (moveBack * weights['moveBack'])
+            + (cross * weights['cross'])
+            + (priceChange * weights['priceChange'])
+          )
 
-            techCollector.s = techScore
-            collector.oscillators.w = this.initTechAnalysisWeights.oscillators
-            collector.candlesticks.w = this.initTechAnalysisWeights.candlesticks
-            collector.moveBack.w = this.initTechAnalysisWeights.moveBack
-            collector.cross.w = this.initTechAnalysisWeights.cross
-            collector.priceChange.w = this.initTechAnalysisWeights.priceChange
+          techCollector.s = techScore
+          collector.oscillators.w = this.initTechAnalysisWeights.oscillators
+          collector.candlesticks.w = this.initTechAnalysisWeights.candlesticks
+          collector.moveBack.w = this.initTechAnalysisWeights.moveBack
+          collector.cross.w = this.initTechAnalysisWeights.cross
+          collector.priceChange.w = this.initTechAnalysisWeights.priceChange
 
-            intervalCollector.s = techScore
-            intervalCollector.w = this.intervalWeights[pair][intervalIdx]
+          intervalCollector.s = techScore
+          intervalCollector.w = this.intervalWeights[pair][intervalIdx]
 
-            this.techPairScore[pair] += techScore * this.intervalWeights[pair][intervalIdx]
+          this.techPairScore[pair] += techScore * this.intervalWeights[pair][intervalIdx]
 
-          }))
-        })
-
-
+        }))
       })
+
 
     })
 
