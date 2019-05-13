@@ -37,6 +37,7 @@ export interface CandleStickSW {
 export interface CandleStickData {
   [depthLevelNumber: number]: {
     w: number
+    s: number
     a: CandleStickSW
   }
 }
@@ -54,20 +55,25 @@ export interface ScoresWeightsEntityV1Model {
     [pair: string]: {
       [interval: string]: {
         w: number
+        s: number
         a: {
           tech: {
             w: number
+            s: number
             a: {
               oscillators: {
                 w: number
+                s: number
                 a: OscillatorSW
               }
               candlesticks: {
                 w: number
+                s: number
                 a: CandleStickData
               }
               moveBack: {
                 w: number
+                s: number
                 a: MoveBackSW
               }
               cross: CrossSW

@@ -80,8 +80,8 @@ class TradeBot implements ITradeBot {
   private droppedPairs: DroppedPair[] = []
   private dollarDiff: number
 
-  private prevTradeBot: TradeBot
-  private hasPrevTradeBot: boolean
+  private readonly prevTradeBot: TradeBot
+  private readonly hasPrevTradeBot: boolean
   private prevOptimalScore: { [pair: string]: number | null } = {}
 
   constructor(user: User, prevTradeBot: TradeBot) {

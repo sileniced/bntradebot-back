@@ -140,6 +140,7 @@ export default (
   const levelArr: [number][] = Array(settings.depth).fill(null).map((_, level) => {
     dataCollector[level] = {
       w: 0,
+      s: 0,
       a: {
         bullish: {},
         bearish: {}
@@ -166,6 +167,7 @@ export default (
     }][]
 
     const machineLearningData: MachineLearningData[] = prevDataEntries.map(([level, { w, a: { bullish, bearish } }]) => {
+
       const bullishEntries = Object.entries(bullish) as [string, { w: number, s: number }][]
       const bullishReduced = bullishEntries.reduce((acc, [bullishNumber, { s }]) => {
         acc.score += s > 0.5 ? dataCollector[level].a.bullish[bullishNumber].w * sigmoid(acc.count, bullishEntries.length) : 0
@@ -186,22 +188,21 @@ export default (
         count: 0
       })
       
-      const score = calcScore(bullishReduced.score, bearishReduced.score)
-      
       return {
         name: level,
         prevData: {
           w,
-          s: score
+          s: calcScore(bullishReduced.score, bearishReduced.score)
         }
       }
     })
 
-    const levelArrWeighted: [string, number][] = addMachineLearningWeights(prevOptimalScore, machineLearningData, true)
+    const levelArrWeighted: [string, number][] = addMachineLearningWeights(prevOptimalScore, machineLearningData)
 
     return {
       _score: levelArrWeighted.reduce((acc, [level, weight]) => {
         dataCollector[level].w = weight
+        dataCollector[level].s = leverArrScore[level]
         return acc + (leverArrScore[level] * weight)
       }, 0)
     }
@@ -213,6 +214,7 @@ export default (
   return {
     _score: levelArrWeighted.reduce((acc, [level, weight]) => {
       dataCollector[level].w = weight
+      dataCollector[level].s = leverArrScore[level]
       return acc + (leverArrScore[level] * weight)
     }, 0)
   }

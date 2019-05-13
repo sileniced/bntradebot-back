@@ -10,6 +10,7 @@ import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
+import { addMachineLearningWeights } from './mlWeightUtils'
 
 export interface AssignedPair {
   pair: string,
@@ -56,12 +57,12 @@ class Analysis implements IAnalysis {
   // todo: user custom (list and weights)
   private readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
-  private readonly intervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
-  private readonly techAnalysisWeights = {
+  private readonly initIntervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
+  private readonly initTechAnalysisWeights = {
     candlesticks: 0.109,
     oscillators: 0.219,
     moveBack: 0.181,
-    crosses: 0.256,
+    cross: 0.256,
     priceChange: 0.235
   }
   private readonly symbolPieWeights = { tech: 0.5, news: 0.05, markets: 0.45 }
@@ -94,8 +95,8 @@ class Analysis implements IAnalysis {
     }
   }
 
-  private prevData: ScoresWeightsEntityV1Model
-  private prevOptimalScore: { [pair: string]: number | null }
+  private readonly prevData: ScoresWeightsEntityV1Model
+  private readonly prevOptimalScore: { [pair: string]: number | null }
 
   constructor({ pairsInfo, getNormalizedSymbols, prevData, prevOptimalScore }: AnalysisInput) {
 
@@ -165,48 +166,51 @@ class Analysis implements IAnalysis {
       const pair = this.pairs[i]
       this.dataCollector.pairs[this.pairs[i]] = {}
       for (let j = 0; j < ien; j++) {
-
         techAnalysisPromises.push(Binance.getCandlesStockData(pair, this.intervalList[j])
         .then((candles: StockData) => {
           if (this.dataCollector.pairs) {
-
-            const priceChangeScore = PriceChangeAnalysis(candles)
-
             this.dataCollector.pairs[pair][this.intervalList[j]] = {
-              w: this.intervalWeights[j],
+              w: this.initIntervalWeights[j],
+              s: 0,
               a: {
                 tech: {
                   w: this.symbolPieWeights.tech,
+                  s: 0,
                   a: {
                     oscillators: {
-                      w: this.techAnalysisWeights.oscillators,
+                      w: 0,
+                      s: 0,
                       a: {}
                     },
                     candlesticks: {
-                      w: this.techAnalysisWeights.candlesticks,
+                      w: 0,
+                      s: 0,
                       a: {}
                     },
                     moveBack: {
-                      w: this.techAnalysisWeights.moveBack,
+                      w: 0,
+                      s: 0,
                       a: {}
                     },
                     cross: {
-                      w: this.techAnalysisWeights.crosses,
+                      w: 0,
                       s: 0
                     },
                     priceChange: {
-                      w: this.techAnalysisWeights.priceChange,
-                      s: priceChangeScore
+                      w: 0,
+                      s: 0
                     }
                   }
                 }
               }
             }
-            const collector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech.a
-            const prevData = this.prevOptimalScore[pair] ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
-            const prevOptimalScore = this.prevOptimalScore[pair]
 
-            const movingAverages = MovingAverages(
+            const techCollector = this.dataCollector.pairs[pair][this.intervalList[j]].a.tech
+            const collector = techCollector.a
+            const prevOptimalScore: number | null = this.prevOptimalScore[pair]
+            const prevData = prevOptimalScore ? this.prevData.pairs[pair][this.intervalList[j]].a.tech.a : collector
+
+            const { crossScore: cross, moveBackScore: moveBack } = MovingAverages(
               candles,
               collector.moveBack.a,
               collector.cross,
@@ -215,23 +219,52 @@ class Analysis implements IAnalysis {
               prevOptimalScore
             )
 
-            this.techPairScore[pair] += (
-              (Oscillators(
-                candles,
-                collector.oscillators.a,
-                prevData.oscillators.a,
-                prevOptimalScore
-              )._score * this.techAnalysisWeights.oscillators)
-              + (CandleStickAnalysis(
-                candles,
-                collector.candlesticks.a,
-                prevData.candlesticks.a,
-                prevOptimalScore
-              )._score * this.techAnalysisWeights.candlesticks)
-              + (movingAverages.moveBackScore * this.techAnalysisWeights.moveBack)
-              + (movingAverages.crossScore * this.techAnalysisWeights.crosses)
-              + (priceChangeScore * this.techAnalysisWeights.priceChange)
-            ) * this.intervalWeights[j]
+            const oscillators = Oscillators(
+              candles,
+              collector.oscillators.a,
+              prevData.oscillators.a,
+              prevOptimalScore
+            )._score
+
+            const candlesticks = CandleStickAnalysis(
+              candles,
+              collector.candlesticks.a,
+              prevData.candlesticks.a,
+              prevOptimalScore
+            )._score
+
+            const priceChange = PriceChangeAnalysis(candles)
+
+            collector.moveBack.s = moveBack
+            collector.oscillators.s = oscillators
+            collector.candlesticks.s = candlesticks
+            collector.priceChange.s = priceChange
+
+            const weights = prevOptimalScore !== null ? addMachineLearningWeights(
+              prevOptimalScore,
+              Object.entries(prevData).map(([name, { s, w }]) => ({ name, prevData: { s, w } })),
+              true
+            ).reduce((acc, [name, weight]) => {
+              acc[name] = weight
+              return acc
+            }, {}) : this.initTechAnalysisWeights
+
+            const techScore = (
+              (oscillators * weights['oscillators'])
+              + (candlesticks * weights['candlesticks'])
+              + (moveBack * weights['moveBack'])
+              + (cross * weights['cross'])
+              + (priceChange * weights['priceChange'])
+            )
+
+            techCollector.s = techScore
+            collector.oscillators.w = this.initTechAnalysisWeights.oscillators
+            collector.candlesticks.w = this.initTechAnalysisWeights.candlesticks
+            collector.moveBack.w = this.initTechAnalysisWeights.moveBack
+            collector.cross.w = this.initTechAnalysisWeights.cross
+            collector.priceChange.w = this.initTechAnalysisWeights.priceChange
+
+            this.techPairScore[pair] += techScore * this.initIntervalWeights[j]
           }
         }))
       }

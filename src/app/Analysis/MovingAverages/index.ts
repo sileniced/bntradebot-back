@@ -81,10 +81,7 @@ export default (
   const crossScore = ((emaCrossAnalysis / maxScore) + (smaCrossAnalysis / maxScore)) / 2
   crossDataCollector.s = crossScore
 
-  return {
-    moveBackScore: (addScores(emaMoveBackAnalysis) + addScores(smaMoveBackAnalysis)) / 2,
-    crossScore: crossScore
-    // _close: close,
-    // analysis
-  }
+  const moveBackScore = (addScores(emaMoveBackAnalysis) + addScores(smaMoveBackAnalysis)) / 2
+
+  return { moveBackScore, crossScore }
 }
