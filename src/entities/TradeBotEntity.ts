@@ -200,6 +200,12 @@ class TradeBotEntity extends BaseEntity {
   }
 
   get prevOptimalScorePair(): { [pair: string]: number } {
+
+    if (!this._prevOptimalScorePair) return this.pairs.reduce((acc, pair) => {
+      acc[pair] = null
+      return acc
+    }, {})
+
     return this.pairs.reduce((acc, pair, idx) => {
       acc[pair] = parseFloat(this._prevOptimalScorePair[idx])
       return acc
