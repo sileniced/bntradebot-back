@@ -27,7 +27,8 @@ class ProfileController {
       symbolPie: trade.symbolPie,
       droppedPairs: trade.droppedPairs,
       tradePairs: trade.tradePairs,
-      balancePostTradeSymbols: trade.balancePostTradeSymbols
+      balancePostTradeSymbols: trade.balancePostTradeSymbols,
+      prevOptimalScorePairs: trade.prevOptimalScorePair
     }))
   }
 }
