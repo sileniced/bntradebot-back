@@ -80,11 +80,11 @@ class TradeBot implements ITradeBot {
   private droppedPairs: DroppedPair[] = []
   private dollarDiff: number
 
-  private readonly prevTradeBot: TradeBot
-  private readonly hasPrevTradeBot: boolean
+  private readonly prevTradeBot: TradeBot | undefined
   private prevOptimalScore: { [pair: string]: number | null } = {}
+  private readonly getScoresWeightPromise: () => Promise<ScoresWeightsEntityV1Model | null> | null
 
-  constructor(user: User, prevTradeBot: TradeBot) {
+  constructor(user: User, prevTradeBot: TradeBot | undefined) {
     this.user = user
     this.entity = new TradeBotEntity()
     this.entity.user = user
@@ -94,7 +94,12 @@ class TradeBot implements ITradeBot {
     this.balancePostTrade = this.getNormalizedSymbols()
 
     this.prevTradeBot = prevTradeBot
-    this.hasPrevTradeBot = Boolean(prevTradeBot)
+    this.getScoresWeightPromise = () => this.prevTradeBot ? null : TradeBotEntity.find({
+      take: 1,
+      where: { user: this.user.id },
+      order: { tradeTime: 'DESC' },
+      relations: ['scoresWeightsV1']
+    }).then((tradeBot: TradeBotEntity[]) => tradeBot[0].scoresWeightsV1.scoresWeights)
 
   }
 
@@ -119,9 +124,12 @@ class TradeBot implements ITradeBot {
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
 
+    let scoresWeight
+    const scoresWeightPromise = !this.prevTradeBot ? this.getScoresWeightPromise() : null
+
     await Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
       this.prices[pair.symbol] = price
-      if (this.hasPrevTradeBot && this.prevTradeBot.prices[pair.symbol]) {
+      if (this.prevTradeBot) {
         const change = (price - this.prevTradeBot.prices[pair.symbol]) / this.prevTradeBot.prices[pair.symbol]
         if (change > 0) {
           const quote = Math.sqrt(change)
@@ -131,7 +139,7 @@ class TradeBot implements ITradeBot {
           this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
         }
       } else {
-        this.prevOptimalScore[pair.symbol] = null
+        this.prevOptimalScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
       }
     })))
 
@@ -140,20 +148,26 @@ class TradeBot implements ITradeBot {
     const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
 
+    if (!this.prevTradeBot) scoresWeight = await scoresWeightPromise
+
     this.analysis = new Analysis({
       pairsInfo: this.pairsInfo,
       getNormalizedSymbols: this.getNormalizedSymbols,
       prevOptimalScore: this.prevOptimalScore,
-      prevData: (this.prevTradeBot ? this.prevTradeBot.analysis.dataCollector : {
-        symbols: {},
-        pairs: {},
-        names: {
-          moveBack: dataCollectorMoveBackNames,
-          candlesticks: dataCollectorCandlestickNames,
-          oscillators: dataCollectorOscillatorNames
-        },
-        market: {}
-      }) as ScoresWeightsEntityV1Model
+      prevData: (this.prevTradeBot
+        ? this.prevTradeBot.analysis.dataCollector
+        : (scoresWeight
+          ? scoresWeight
+          : {
+            symbols: {},
+            pairs: {},
+            names: {
+              moveBack: dataCollectorMoveBackNames,
+              candlesticks: dataCollectorCandlestickNames,
+              oscillators: dataCollectorOscillatorNames
+            },
+            market: {}
+          })) as ScoresWeightsEntityV1Model
     })
     const analysisPromise = this.analysis.run(logger)
 
@@ -195,8 +209,8 @@ class TradeBot implements ITradeBot {
     const addToFinalPairs = (pair: Trade) => {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
-                                          /** DEV HERE*/
-      this.tradePromises.push(Binance.newOrder/*Test*/(this.user, pair.feeDollar, {
+      /** DEV HERE*/
+      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),

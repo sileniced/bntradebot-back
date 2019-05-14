@@ -17,7 +17,7 @@ export default (
     ? addMachineLearningWeights(prevOptimalScore, Object.keys(settings).map(name => ({
       name,
       prevData: prevData[dataCollectorOscillatorNames[name]]
-    })))
+    })), true)
     : addEVENWeight(Object.keys(settings).map(name => [name]))
 
   const values = Values(data)
