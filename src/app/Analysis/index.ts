@@ -33,6 +33,7 @@ export interface MarketAnalysisResult {
   multiplier: number
   poweredScore: number
   battleScore: number
+  battleWins: number
 }
 
 export interface IAnalysis {
@@ -127,7 +128,8 @@ class Analysis implements IAnalysis {
       score: 0,
       multiplier: 0,
       poweredScore: 0,
-      battleScore: 0
+      battleScore: 0,
+      battleWins: 0
     }
 
     const quoteSymbols = Object.entries(pairsInfo.map(pair => pair.quoteAsset)
@@ -335,7 +337,8 @@ class Analysis implements IAnalysis {
         score: quoteScore,
         multiplier: quoteMultiplier,
         poweredScore: quoteScore + quoteMultiplier,
-        battleScore: quoteScore + quoteMultiplier
+        battleScore: quoteScore + quoteMultiplier,
+        battleWins: 0
       }
 
       this.marketScore['ALTS'].score += baseScore / qen
@@ -345,8 +348,8 @@ class Analysis implements IAnalysis {
 
     }
 
-    for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.marketSymbols[i]
+    /** battledScore */
+    this.marketSymbols.forEach(quoteSymbol => {
       this.pairsPerSymbol[quoteSymbol].forEach(pair => {
         if (this.marketSymbols.includes(pair.baseAsset) && pair.quoteAsset === quoteSymbol) {
           this.marketScore[pair.baseAsset].battleScore = this.marketScore[pair.baseAsset].poweredScore
@@ -355,14 +358,16 @@ class Analysis implements IAnalysis {
           const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
           this.marketScore[pair.baseAsset].battleScore += baseTechScore
           this.marketScore[pair.quoteAsset].battleScore -= baseTechScore
+
+          this.marketScore[baseTechScore > 0 ? pair.baseAsset : pair.quoteAsset].battleWins++
         }
       })
-    }
+    })
 
-    for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.marketSymbols[i]
-      this.marketScore[quoteSymbol].battleScore = this.marketScore[quoteSymbol].battleScore < 0 ? 0 : this.marketScore[quoteSymbol].battleScore
-    }
+    this.marketSymbols.forEach(quoteSymbol => {
+      const { battleWins, battleScore} = this.marketScore[quoteSymbol]
+      this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
+    })
 
     for (let i = 0; i < qen; i++) {
       logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
