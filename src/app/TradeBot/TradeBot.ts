@@ -210,7 +210,7 @@ class TradeBot implements ITradeBot {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
       /** DEV HERE*/
-      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
+      this.tradePromises.push(Binance.newOrder/*Test*/(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),
