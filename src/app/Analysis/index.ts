@@ -10,7 +10,7 @@ import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { IntervalData, ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
-import { addMachineLearningWeights } from './mlWeightUtils'
+import { addMachineLearningWeights, MachineLearningData } from './mlWeightUtils'
 import { SMA } from 'technicalindicators'
 
 export interface AssignedPair {
@@ -200,7 +200,7 @@ class Analysis implements IAnalysis {
           this.prevOptimalScore[pair] = prevOptimalScore
 
           this.intervalWeights[pair] = []
-          addMachineLearningWeights(prevOptimalScore, Object.entries(prevIntervalData).map(([interval, { w, s }]) => ({
+          addMachineLearningWeights(prevOptimalScore, Object.entries(prevIntervalData).map(([interval, { w, s }]): MachineLearningData => ({
             name: interval,
             prevData: { w, s }
           }))).forEach(([interval, weight]) => {
@@ -278,7 +278,13 @@ class Analysis implements IAnalysis {
           const weights = prevOptimalScore !== null
             ? addMachineLearningWeights(
               prevOptimalScore,
-              Object.entries(prevData).map(([name, { s, w }]) => ({ name, prevData: { s, w } }))
+              Object.entries(prevData).map(([name, { s, w }]): MachineLearningData => ({
+                name,
+                prevData: {
+                  s,
+                  w
+                }
+              }))
             ).reduce((acc, [name, weight]) => {
               acc[name] = weight
               return acc
@@ -305,6 +311,10 @@ class Analysis implements IAnalysis {
 
           this.techPairScore[pair] += techScore * this.intervalWeights[pair][intervalIdx]
 
+        })
+        .catch((e) => {
+          console.error(e)
+          throw e
         }))
       })
 
@@ -365,7 +375,7 @@ class Analysis implements IAnalysis {
     })
 
     this.marketSymbols.forEach(quoteSymbol => {
-      const { battleWins, battleScore} = this.marketScore[quoteSymbol]
+      const { battleWins, battleScore } = this.marketScore[quoteSymbol]
       this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
     })
 

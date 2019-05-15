@@ -26,25 +26,26 @@ export interface MachineLearningData {
 
 export const addMachineLearningWeights = (
   prevOptimalScore: number,
-  periodsArr: MachineLearningData[],
+  data: MachineLearningData[],
   log: Boolean = false
 ): [string, number][] => {
 
   let total = 0
-  const newWeights = periodsArr.map(period => {
+  const newWeights = data.map(row => {
     const newWeight = calcWeight(
-      period.prevData.s,
-      period.prevData.w,
+      row.prevData.s,
+      row.prevData.w,
       prevOptimalScore
     )
 
     total += newWeight
-    return [period.name, newWeight]
+    return [row.name, newWeight]
+
   })
 
   const artifact: [string, number][] = newWeights.map(([name, weight]) => [name, weight / total])
 
-  log && Math.random() > 0.1 && console.table(periodsArr.map((period, idx) => ({
+  log && Math.random() > 0.1 && console.table(data.map((period, idx) => ({
     name: period.name,
     prevOptimalScore,
     score: period.prevData.s,
