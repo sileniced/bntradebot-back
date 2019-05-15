@@ -1,7 +1,6 @@
 import { CandleChartInterval, OrderSide, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
-import { Binance } from '../../index'
 import Oscillators from './Oscillators'
 import MovingAverages from './MovingAverages'
 import CandleStickAnalysis from './CandleStickAnalysis'
@@ -12,6 +11,7 @@ import { IntervalData, ScoresWeightsEntityV1Model } from '../../entities/ScoresW
 import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
 import { addMachineLearningWeights } from './mlWeightUtils'
 import { SMA } from 'technicalindicators'
+import BinanceApi from '../Binance'
 
 export interface AssignedPair {
   pair: string,
@@ -37,7 +37,7 @@ export interface MarketAnalysisResult {
 }
 
 export interface IAnalysis {
-  run(logger: Logger): Promise<void>,
+  run(logger: Logger, Binance: BinanceApi): Promise<void>,
 
   techPairScore: { [pair: string]: number }
   techSymbolScore: { [symbol: string]: number }
@@ -53,11 +53,33 @@ export interface IAnalysis {
 
 class Analysis implements IAnalysis {
 
+  static getPrevOptimalScore = (sma, priceChange) => (sma * 0.8) + (priceChange * 0.2)
+
+  static getPriceChangeScore = (previous, current) => {
+    const change = (current - previous) / previous
+    if (change > 0) {
+      const quote = Math.sqrt(change)
+      return quote > 0.5 ? 1 : 0.5 + quote
+    } else {
+      const quote = Math.sqrt(-change)
+      return quote > 0.5 ? 0 : 0.5 - quote
+    }
+  }
+
+  static getPrevOptimalSmaScore = (candles: StockData) => {
+    const [previous, current] = SMA.calculate({
+      values: candles.close,
+      period: 12
+    }).slice(-2)
+
+    return Analysis.getPriceChangeScore(previous, current)
+  }
+
   private readonly pairsInfo: Symbol[] = []
   public apiCalls: number = 0
 
   // todo: user custom (list and weights)
-  private readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+  static readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
   private readonly initIntervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
   private intervalWeights: { [pair: string]: number[] } = {}
@@ -156,7 +178,7 @@ class Analysis implements IAnalysis {
     this.prevOptimalPriceChangeScore = prevOptimalScore
   }
 
-  public async run(logger: Logger): Promise<void> {
+  public async run(logger: Logger, Binance: BinanceApi): Promise<void> {
     const start = Date.now()
     this.newsScore = new AnalysisNews({ symbols: this.symbols })
     const newsAnalysisPromise = this.newsScore.run(logger)
@@ -170,30 +192,17 @@ class Analysis implements IAnalysis {
     this.pairs.forEach(pair => {
       prevOptimalSMAScorePromises.push(Binance.getCandlesStockData(pair, '5m', 15)
       .then((candles: StockData) => {
-        const [previous, current] = SMA.calculate({
-          values: candles.close,
-          period: 12
-        }).slice(-2)
-
-        const change = (current - previous) / previous
-        if (change > 0) {
-          const quote = Math.sqrt(change)
-          this.prevOptimalSMAScore[pair] = quote > 0.5 ? 1 : 0.5 + quote
-        } else {
-          const quote = Math.sqrt(-change)
-          this.prevOptimalSMAScore[pair] = quote > 0.5 ? 0 : 0.5 - quote
-        }
 
         if (!this.dataCollector.pairs) return
         this.dataCollector.pairs[pair] = {
-          o: this.prevOptimalSMAScore[pair],
+          o: Analysis.getPrevOptimalSmaScore(candles),
           s: 0,
           a: {}
         }
 
         const prevOptimalPriceChangeScore = this.prevOptimalPriceChangeScore[pair]
         if (prevOptimalPriceChangeScore !== null) {
-          const prevOptimalScore: number = (prevOptimalPriceChangeScore * 0.2) + (this.prevOptimalSMAScore[pair] * 0.8)
+          const prevOptimalScore: number = Analysis.getPrevOptimalScore(this.prevOptimalSMAScore[pair], prevOptimalPriceChangeScore)
 
           const prevIntervalData: IntervalData = this.prevData.pairs[pair].a
           this.dataCollector.pairs[pair].o = prevOptimalScore
@@ -204,7 +213,7 @@ class Analysis implements IAnalysis {
             name: interval,
             prevData: { w, s }
           }))).forEach(([interval, weight]) => {
-            this.intervalWeights[pair][this.intervalList.indexOf(interval as CandleChartInterval)] = weight
+            this.intervalWeights[pair][Analysis.intervalList.indexOf(interval as CandleChartInterval)] = weight
           })
         } else {
           this.intervalWeights[pair] = this.initIntervalWeights
@@ -219,7 +228,7 @@ class Analysis implements IAnalysis {
 
     /** this.techPairScore[pair] = */
     this.pairs.forEach(pair => {
-      this.intervalList.forEach((interval, intervalIdx) => {
+      Analysis.intervalList.forEach((interval, intervalIdx) => {
         techAnalysisPromises.push(Binance.getCandlesStockData(pair, interval)
         .then((candles: StockData) => {
           if (!this.dataCollector.pairs) return
@@ -242,8 +251,16 @@ class Analysis implements IAnalysis {
           const collector = techCollector.a
 
           const prevOptimalPriceChangeScore: number | null = this.prevOptimalPriceChangeScore[pair]
-          const prevOptimalScore: number | null = prevOptimalPriceChangeScore !== null ? (prevOptimalPriceChangeScore * 0.2) + (this.prevOptimalSMAScore[pair] * 0.8) : null
-          const prevData = prevOptimalScore ? this.prevData.pairs[pair].a[interval].a.tech.a : collector
+
+          const prevOptimalScore: number | null =
+            prevOptimalPriceChangeScore !== null
+              ? Analysis.getPrevOptimalScore(this.prevOptimalSMAScore[pair], prevOptimalPriceChangeScore)
+              : null
+
+          const prevData =
+            prevOptimalScore
+              ? this.prevData.pairs[pair].a[interval].a.tech.a
+              : collector
 
           const { crossScore: cross, moveBackScore: moveBack } = MovingAverages(
             candles,
@@ -365,7 +382,7 @@ class Analysis implements IAnalysis {
     })
 
     this.marketSymbols.forEach(quoteSymbol => {
-      const { battleWins, battleScore} = this.marketScore[quoteSymbol]
+      const { battleWins, battleScore } = this.marketScore[quoteSymbol]
       this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
     })
 

@@ -64,8 +64,7 @@ class BinanceApi {
     this.activeTradeBotUserIds.forEach(id => {
 
       this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      this.prevTradeBot[id].run()
-      .catch(console.error)
+      this.prevTradeBot[id].run(this).catch(console.error)
     })
 
 
@@ -126,10 +125,16 @@ class BinanceApi {
     return error
   })
 
-  public getCandlesStockData = (symbol, interval: CandleChartInterval, limit = 200): Promise<StockData> => this.api.candles({
+  public getCandlesStockData = (
+    symbol: string,
+    interval: CandleChartInterval,
+    limit: number = 200,
+    history?: number
+  ): Promise<StockData> => this.api.candles({
     symbol,
     interval,
-    limit
+    limit,
+    endTime: history
   })
   .then(candles => CreateTechAnalysisData(candles))
   .catch(error => {

@@ -37,6 +37,9 @@ class User extends BaseEntity {
   @OneToMany(() => SavedOrder, savedOrder => savedOrder.user)
   public savedOrders: SavedOrder
 
+  @Column('simple-array', { nullable: true })
+  public symbols: string[]
+
   @Column('text', { nullable: true })
   @Exclude({ toPlainOnly: true })
   public password: string

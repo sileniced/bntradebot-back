@@ -77,6 +77,12 @@ export interface IntervalData {
   }
 }
 
+export interface PairData {
+  o: number,
+  s: number
+  a: IntervalData
+}
+
 export interface ScoresWeightsEntityV1Model {
   names: {
     oscillators: { [oscilatorName: string]: number }
@@ -87,11 +93,7 @@ export interface ScoresWeightsEntityV1Model {
     moveBack: { [moveBackName: string]: number }
   },
   pairs: {
-    [pair: string]: {
-      o: number,
-      s: number
-      a: IntervalData
-    }
+    [pair: string]: PairData
   }
   symbols: {
     [symbol: string]: {

@@ -1,5 +1,4 @@
 import User from '../../entities/User'
-import { Binance } from '../../index'
 import { OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
@@ -12,6 +11,7 @@ import {
   dataCollectorMoveBackNames,
   dataCollectorOscillatorNames
 } from '../Analysis/utils'
+import BinanceApi from '../Binance'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -61,8 +61,6 @@ class TradeBot implements ITradeBot {
   protected readonly user: User
   private entity: TradeBotEntity
 
-  // todo: get from user database ('USDT' required)
-  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC']
   protected pairsInfo: Symbol[] = []
 
   private balance: { [pair: string]: number } = {}
@@ -88,7 +86,7 @@ class TradeBot implements ITradeBot {
     this.user = user
     this.entity = new TradeBotEntity()
     this.entity.user = user
-    this.entity.symbols = this.symbols
+    this.entity.symbols = this.user.symbols
 
     this.balance = this.getNormalizedSymbols()
     this.balancePostTrade = this.getNormalizedSymbols()
@@ -105,18 +103,18 @@ class TradeBot implements ITradeBot {
 
   protected readonly getNormalizedSymbols = (): { [symbol: string]: number } => {
     const obj = {}
-    for (let i = 0, len = this.symbols.length; i < len; i++) obj[this.symbols[i]] = 0
+    for (let i = 0, len = this.user.symbols.length; i < len; i++) obj[this.user.symbols[i]] = 0
     return obj
   }
 
-  public async run() {
+  public async run(Binance: BinanceApi) {
     const balanceBtc = this.getNormalizedSymbols()
     const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     const differenceBtc = this.getNormalizedSymbols()
     const difference = this.getNormalizedSymbols()
 
     await Binance.getPairs().then(pairInfo => {
-      this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
+      this.pairsInfo = pairInfo.filter(pair => this.user.symbols.includes(pair.baseAsset) && this.user.symbols.includes(pair.quoteAsset))
       this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
     })
     const start = Date.now()
@@ -130,14 +128,7 @@ class TradeBot implements ITradeBot {
     await Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
       this.prices[pair.symbol] = price
       if (this.prevTradeBot) {
-        const change = (price - this.prevTradeBot.prices[pair.symbol]) / this.prevTradeBot.prices[pair.symbol]
-        if (change > 0) {
-          const quote = Math.sqrt(change)
-          this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 1 : 0.5 + quote
-        } else {
-          const quote = Math.sqrt(-change)
-          this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
-        }
+        this.prevOptimalScore[pair.symbol] = Analysis.getPriceChangeScore(this.prevTradeBot.prices[pair.symbol], price)
       } else {
         this.prevOptimalScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
       }
@@ -145,7 +136,7 @@ class TradeBot implements ITradeBot {
 
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
 
-    const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
+    const pricesBtcNames: string[] = this.user.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
 
     if (!this.prevTradeBot) scoresWeight = await scoresWeightPromise
@@ -169,7 +160,7 @@ class TradeBot implements ITradeBot {
             market: {}
           })) as ScoresWeightsEntityV1Model
     })
-    const analysisPromise = this.analysis.run(logger)
+    const analysisPromise = this.analysis.run(logger, Binance)
 
     await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
     .then(([btcUsdtPrice, pricesBtc, balances]) => {
@@ -182,7 +173,7 @@ class TradeBot implements ITradeBot {
       for (let i = 0, len = balances.length; i < len; i++) {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
-        if (amount > 0 && this.symbols.includes(balance.asset)) {
+        if (amount > 0 && this.user.symbols.includes(balance.asset)) {
           this.balance[balance.asset] += amount
           balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
           dollarBalance[balance.asset] += balanceBtc[balance.asset] * this.prices['BTCUSDT']
@@ -258,8 +249,8 @@ class TradeBot implements ITradeBot {
       return acc
     }, {})
 
-    for (let i = 0, len = this.symbols.length; i < len; i++) {
-      const symbol = this.symbols[i]
+    for (let i = 0, len = this.user.symbols.length; i < len; i++) {
+      const symbol = this.user.symbols[i]
       symPieBtc[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc
       balancePerc[symbol] += (balanceBtc[symbol] / this.balanceTotalBtc)
       diffPerc[symbol] += balancePerc[symbol] - this.analysis.symbolPie[symbol]
@@ -365,7 +356,7 @@ class TradeBot implements ITradeBot {
       for (let i = 0, len = balances.length; i < len; i++) {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
-        if (amount > 0 && this.symbols.includes(balance.asset)) {
+        if (amount > 0 && this.user.symbols.includes(balance.asset)) {
           const amountBtc = amount * this.prices[`${balance.asset}BTC`]
           newTotalBtc += amountBtc
           newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
