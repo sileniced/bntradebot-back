@@ -1,11 +1,28 @@
 import User from '../entities/User'
 
 import { Symbol } from 'binance-api-node'
-import { PairData } from '../entities/ScoresWeightsEntityV1'
+import { CandleStickSW, IntervalData, IntervalDataSWA, PairData } from '../entities/ScoresWeightsEntityV1'
 import BinanceApi from './Binance'
 import StockData from 'technicalindicators/declarations/StockData'
 import Analysis from './Analysis'
 import PairWeightsEntityV1 from '../entities/PairWeightsEntityV1'
+import { addEVENWeight, addNAIVEWeight } from './Analysis/mlWeightUtils'
+import oscillatorsSettings from './Analysis/Oscillators/settings'
+import {
+  CandlestickIdxs,
+  MoveBackIdxs,
+  OscillatorIdxs
+} from './Analysis/utils'
+import {
+  bearish,
+  bullish,
+  CandleStickAnalysisML,
+  settings as candleSticksSettings
+} from './Analysis/CandleStickAnalysis'
+import movingAveragesSettings from './Analysis/MovingAverages/settings'
+import { MovingAveragesML } from './Analysis/MovingAverages'
+import { OscillatorsML } from './Analysis/Oscillators'
+import PriceChangeAnalysis from './Analysis/PriceChangeAnalysis'
 
 interface IMachineLearningTrainer {
   startTraining: () => void
@@ -38,7 +55,7 @@ const firstTradeDay = {
   'NEOBNB': '11/20/2017',
   'IOTABNB': '11/28/2017',
   'LTCBNB': '12/13/2017',
-  'EOSBNB': '05/28/2018',
+  'EOSBNB': '05/28/2018'
 }
 
 
@@ -89,7 +106,6 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
      *
      */
     const prevOptimalScorePromises: Promise<void>[] = participatingPairs.map(pair => {
-      const dataCollector = this.activePairs[pair].weights
       return this.Binance.getCandlesStockData(
         pair,
         '5m',
@@ -97,7 +113,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
         history[pair] + (1000 * 60 * 10))
       .then((candles: StockData) => {
         const [current, , future] = candles.close.slice(-3)
-        dataCollector.o = Analysis.getPrevOptimalScore(
+        this.activePairs[pair].weights.o = Analysis.getPrevOptimalScore(
           Analysis.getPrevOptimalSmaScore(candles),
           Analysis.getPriceChangeScore(current, future)
         )
@@ -111,19 +127,137 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
       return acc
     }, {}))
 
-    // const techAnalysisPromises: Promise<void>[] = []
-    //
-    // selectedPairs.forEach(pair => {
-    //   Analysis.intervalList.forEach((interval, intervalIdx) => {
-    //     techAnalysisPromises.push(this.Binance.getCandlesStockData(pair, interval, 200, history[pair])
-    //     .then((candles: StockData) => {
-    //
-    //     }))
-    //   })
-    // })
+
+    // first get the scores with the current weights
+    // use the prevOptimalScore to change the current weights to new weights
+
+    const techAnalysisPromises: Promise<void>[] = []
+    selectedPairs.forEach(pair => {
+      Analysis.intervalList.forEach(interval => {
+        techAnalysisPromises.push(this.Binance.getCandlesStockData(pair, interval, 200, history[pair])
+        .then((candles: StockData) => {
+
+          const techCollector = this.activePairs[pair].weights.a[interval].a.tech.a
+
+          MovingAveragesML(
+            candles,
+            techCollector.moveBack.a,
+            techCollector.cross,
+          )
+
+          OscillatorsML(
+            candles,
+            techCollector.oscillators.a
+          )
+
+          CandleStickAnalysisML(
+            candles,
+            techCollector.candlesticks.a
+          )
+
+          techCollector.priceChange.s = PriceChangeAnalysis(candles)
+
+          console.log('techCollector = ', pair, techCollector)
+
+        })
+        .catch((e) => {
+          console.error(e)
+          throw e
+        }))
+      })
+    })
   }
 
+  private getInitWeights = (pair): IntervalData => {
+    const data = Analysis.intervalList.reduce((acc, interval, intervalIdx) => {
+      acc[interval] = {
+        w: Analysis.initIntervalWeights[intervalIdx],
+        s: 0,
+        a: {
+          tech: {
+            w: Analysis.symbolPieWeights.tech,
+            s: 0,
+            a: {
+              oscillators: {
+                w: Analysis.initTechAnalysisWeights.oscillators,
+                s: 0,
+                a: addEVENWeight(Object.keys(oscillatorsSettings).map(name => [name])).reduce((acc, [name, weight]) => {
+                  acc[OscillatorIdxs[name]] = {
+                    w: weight,
+                    s: 0
+                  }
+                  return acc
+                }, {})
+              },
+              candlesticks: {
+                w: Analysis.initTechAnalysisWeights.candlesticks,
+                s: 0,
+                a: addNAIVEWeight(Array(candleSticksSettings.depth).fill(null).map((_, level) => [level])).reduce((acc, [level, weight]) => {
+                  acc[level] = {
+                    w: weight,
+                    s: 0,
+                    a: {
+                      bullish: addEVENWeight(bullish).reduce((acc, [name, , weight]) => {
+                        acc[CandlestickIdxs.bullish[name]] = {
+                          w: weight,
+                          s: 0
+                        }
+                        return acc
+                      }, {}),
+                      bearish: addEVENWeight(bearish).reduce((acc, [name, , weight]) => {
+                        acc[CandlestickIdxs.bearish[name]] = {
+                          w: weight,
+                          s: 0
+                        }
+                        return acc
+                      }, {})
+                    } as CandleStickSW
+                  }
+                  return acc
+                }, {})
+              },
+              moveBack: {
+                w: Analysis.initTechAnalysisWeights.moveBack,
+                s: 0,
+                a: {
+                  ...addNAIVEWeight(movingAveragesSettings.EMA.periods.map(period => [`EMA${period}`])).reduce((acc, [name, weight]) => {
+                    acc[MoveBackIdxs[name]] = {
+                      w: weight,
+                      s: 0
+                    }
+                    return acc
+                  }, {}),
+                  ...addNAIVEWeight(movingAveragesSettings.SMA.periods.map(period => [`SMA${period}`])).reduce((acc, [name, weight]) => {
+                    acc[MoveBackIdxs[name]] = {
+                      w: weight,
+                      s: 0
+                    }
+                    return acc
+                  }, {})
+                }
+              },
+              cross: {
+                w: Analysis.initTechAnalysisWeights.cross,
+                s: 0
+              },
+              priceChange: {
+                w: Analysis.initTechAnalysisWeights.priceChange,
+                s: 0
+              }
+            }
+          }
+        }
+      } as IntervalDataSWA
+      return acc
+    }, {})
 
+    PairWeightsEntityV1.create({
+      pairName: pair,
+      weights: data
+    }).save().catch(console.error)
+
+    return data
+  }
 
   public startTraining = async (): Promise<void> => {
 
@@ -138,14 +272,12 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
       .filter(pair => user.symbols.includes(pair.baseAsset) && user.symbols.includes(pair.quoteAsset))
       .forEach(pair => {
         if (!this.activePairs[pair.symbol]) {
-          pairWeightsPromises.push(PairWeightsEntityV1.findOne({ where: { pairName: pair } }).then(pairWeights => {
+          pairWeightsPromises.push(PairWeightsEntityV1.find({ where: { pairName: pair.symbol } }).then(pairWeights => {
             this.activePairs[pair.symbol] = {
               users: [user.id],
               info: pair,
               weights: {
-                a: pairWeights ? pairWeights.weights : {
-
-                },
+                a: pairWeights[0] ? pairWeights[0].weights : this.getInitWeights(pair.symbol),
                 o: 0.5,
                 s: 0.5
               }
@@ -156,6 +288,8 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
         }
       })
     })
+
+    await Promise.all(pairWeightsPromises)
 
     this.trainingExecute().catch(console.error)
     // setInterval(this.trainingExecute, 6000)

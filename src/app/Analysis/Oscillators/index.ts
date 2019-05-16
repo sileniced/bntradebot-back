@@ -3,8 +3,22 @@ import settings from './settings'
 import Values from './Values'
 import Scoring from './Scoring'
 import { OscillatorSW } from '../../../entities/ScoresWeightsEntityV1'
-import { addScores, dataCollectorOscillatorNames } from '../utils'
+import { addScores, OscillatorIdxs, OscillatorNames } from '../utils'
 import { addEVENWeight, addMachineLearningWeights, MachineLearningData } from '../mlWeightUtils'
+
+export const OscillatorsML = (
+  stockData: StockData,
+  oscillatorSW: OscillatorSW,
+) => {
+  const oscillatorsNumbers = Object.keys(oscillatorSW)
+
+  const values = Values(stockData)
+  const scoring = Scoring(values)
+
+  oscillatorsNumbers.forEach(oscillatorsNumber => {
+    oscillatorSW[oscillatorsNumber].s = scoring[OscillatorNames[oscillatorsNumber]]()
+  })
+}
 
 export default (
   data: StockData,
@@ -16,7 +30,7 @@ export default (
   const oscillatorsList = prevOptimalScore !== null
     ? addMachineLearningWeights(prevOptimalScore, Object.keys(settings).map((name): MachineLearningData => ({
       name,
-      prevData: prevData[dataCollectorOscillatorNames[name]]
+      prevData: prevData[OscillatorIdxs[name]]
     })), false)
     : addEVENWeight(Object.keys(settings).map(name => [name]))
 
@@ -26,7 +40,7 @@ export default (
   const analysis = oscillatorsList.reduce((acc, [name, weight]) => {
     const score = scoring[name]()
 
-    dataCollector[dataCollectorOscillatorNames[name]] = {
+    dataCollector[OscillatorIdxs[name]] = {
       w: weight,
       s: score
     }

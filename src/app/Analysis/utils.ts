@@ -1,4 +1,4 @@
-export const dataCollectorMoveBackNames = {
+export const MoveBackIdxs = {
   'EMA10': 0,
   'EMA20': 1,
   'EMA50': 2,
@@ -11,7 +11,9 @@ export const dataCollectorMoveBackNames = {
   'SMA200': 9,
 }
 
-export const dataCollectorCandlestickNames = {
+export const MoveBackNames = Object.keys(MoveBackIdxs)
+
+export const CandlestickIdxs = {
   bullish: {
     'BullishEngulfingPattern': 0,
     'DownsideTasukiGap': 1,
@@ -46,7 +48,12 @@ export const dataCollectorCandlestickNames = {
   }
 }
 
-export const dataCollectorOscillatorNames = {
+export const CandlestickNames = {
+  bullish: Object.keys(CandlestickIdxs.bullish),
+  bearish: Object.keys(CandlestickIdxs.bearish)
+}
+
+export const OscillatorIdxs = {
   'RSI': 0,
   'StochRSI': 1,
   'StochFast': 2,
@@ -56,5 +63,7 @@ export const dataCollectorOscillatorNames = {
   'MACD': 6,
   'WPR': 7
 }
+
+export const OscillatorNames = Object.keys(OscillatorIdxs)
 
 export const addScores = scores => Object.values(scores).reduce((acc, { _score }) => acc + _score, 0)

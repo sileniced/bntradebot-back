@@ -2,7 +2,7 @@ import binance, {
   AssetBalance,
   AvgPriceResult,
   Binance, CandleChartInterval,
-  CandleChartResult,
+  CandleChartResult, CandlesOptions,
   ExchangeInfo,
   NewOrder,
   OrderBook,
@@ -64,7 +64,7 @@ class BinanceApi {
     this.activeTradeBotUserIds.forEach(id => {
 
       this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      this.prevTradeBot[id].run()
+      this.prevTradeBot[id].run(this)
       .catch((e) => {
         console.error(e)
         throw e
@@ -133,18 +133,21 @@ class BinanceApi {
     symbol: string,
     interval: CandleChartInterval,
     limit: number = 200,
-    history?: number
-  ): Promise<StockData> => this.api.candles({
-    symbol,
-    interval,
-    limit,
-    endTime: history
-  })
-  .then(candles => CreateTechAnalysisData(candles))
-  .catch(error => {
-    console.error(error)
-    return error
-  })
+    endTime?: number
+  ): Promise<StockData> => {
+    const options: CandlesOptions = {
+      symbol,
+      interval,
+      limit,
+    }
+    if (endTime) options.endTime = endTime
+    return this.api.candles(options)
+    .then(candles => CreateTechAnalysisData(candles))
+    .catch(error => {
+      console.error(error)
+      return error
+    })
+  }
 
   public getBook = (symbol): Promise<OrderBook> => this.api.book({ symbol })
 

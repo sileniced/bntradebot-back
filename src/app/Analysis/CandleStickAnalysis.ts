@@ -1,14 +1,14 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
 import { CandleStickData, CandleStickSW } from '../../entities/ScoresWeightsEntityV1'
-import { dataCollectorCandlestickNames } from './utils'
+import { CandlestickIdxs, CandlestickNames } from './utils'
 import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from './mlWeightUtils'
 
-const settings = {
+export const settings = {
   depth: 10
 }
 
-const bullish: [string, number][] = [
+export const bullish: [string, number][] = [
   ['BullishEngulfingPattern', 2],
   ['DownsideTasukiGap', 3],
   ['BullishHarami', 2],
@@ -25,7 +25,7 @@ const bullish: [string, number][] = [
   ['TweezerBottom', 5]
 ]
 
-const bearish: [string, number][] = [
+export const bearish: [string, number][] = [
   ['BearishEngulfingPattern', 2],
   ['BearishHarami', 2],
   ['BearishHaramiCross', 2],
@@ -52,6 +52,13 @@ const sliceStockData = (data: StockData, last: number): StockData => ({
 const sigmoid = (count, length) => (2 - ((2 * count) / length))
 const calcScore = (bullish, bearish) => 0.5 + (bullish / 2) - (bearish / 2)
 
+const DataLast = (data: StockData) => ({
+  [1]: sliceStockData(data, 1),
+  [2]: sliceStockData(data, 2),
+  [3]: sliceStockData(data, 3),
+  [5]: sliceStockData(data, 5)
+})
+
 const run = (
   data: StockData,
   dataCollector: CandleStickSW,
@@ -62,28 +69,23 @@ const run = (
   const bullishArr = prevOptimalScore
     ? addMachineLearningWeights(prevOptimalScore, bullish.map(([name]): MachineLearningData => ({
       name,
-      prevData: prevData.bullish[dataCollectorCandlestickNames.bullish[name]]
+      prevData: prevData.bullish[CandlestickIdxs.bullish[name]]
     }))).map(([name, weight], idx) => [name, bullish[idx][1], weight])
     : addEVENWeight(bullish)
 
   const bearishArr = prevOptimalScore
     ? addMachineLearningWeights(1 - prevOptimalScore, bearish.map(([name]): MachineLearningData => ({
       name,
-      prevData: prevData.bearish[dataCollectorCandlestickNames.bearish[name]]
+      prevData: prevData.bearish[CandlestickIdxs.bearish[name]]
     }))).map(([name, weight], idx) => [name, bearish[idx][1], weight])
     : addEVENWeight(bearish)
 
-  const dataLast = {
-    [1]: sliceStockData(data, 1),
-    [2]: sliceStockData(data, 2),
-    [3]: sliceStockData(data, 3),
-    [5]: sliceStockData(data, 5)
-  }
+  const dataLast = DataLast(data)
 
   const analysis = {
     bullish: bullishArr.reduce((acc, [name, amount, weight], _, src) => {
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
-      dataCollector.bullish[dataCollectorCandlestickNames.bullish[name]] = {
+      dataCollector.bullish[CandlestickIdxs.bullish[name]] = {
         w: weight,
         s: acc[name] ? 0.51 : 0
       }
@@ -98,7 +100,7 @@ const run = (
     }),
     bearish: bearishArr.reduce((acc, [name, amount, weight], _, src) => {
       acc[name] = TI[name.toLowerCase()](dataLast[amount])
-      dataCollector.bearish[dataCollectorCandlestickNames.bearish[name]] = {
+      dataCollector.bearish[CandlestickIdxs.bearish[name]] = {
         w: weight,
         s: acc[name] ? 0.51 : 0
       }
@@ -121,12 +123,37 @@ const run = (
   }
 }
 
-const shortenStockData = (data: StockData, length: number): StockData => ({
+const ShortenStockData = (data: StockData, length: number): StockData => ({
   open: data.open.slice(0, length),
   close: data.close.slice(0, length),
   high: data.high.slice(0, length),
   low: data.low.slice(0, length)
 })
+
+export const CandleStickAnalysisML = (
+  stockData: StockData,
+  candleStickData: CandleStickData
+) => {
+  const length = stockData.close.length
+  const levels: string[] = Object.keys(candleStickData)
+  levels.forEach(level => {
+    const shortenedData = ShortenStockData(stockData, length - parseInt(level))
+    const dataLast = DataLast(shortenedData)
+
+    const bullishNumbers = Object.keys(candleStickData[level].a.bullish)
+    const bearishNumbers = Object.keys(candleStickData[level].a.bearish)
+
+    bullishNumbers.forEach(bullishNumber => {
+      candleStickData[level].a.bullish[bullishNumber].s = TI[CandlestickNames.bullish[bullishNumber].toLowerCase()](dataLast[bullish[bullishNumber][1]]) ? 1 : 0
+    })
+
+    bearishNumbers.forEach(bearishNumber => {
+      candleStickData[level].a.bearish[bearishNumber].s = TI[CandlestickNames.bearish[bearishNumber].toLowerCase()](dataLast[bearish[bearishNumber][1]]) ? 1 : 0
+    })
+    
+  })
+
+}
 
 export default (
   data: StockData,
@@ -150,7 +177,7 @@ export default (
   })
 
   const leverArrScore = levelArr.map(([level]) => run(
-    shortenStockData(data, length - level),
+    ShortenStockData(data, length - level),
     dataCollector[level].a,
     prevOptimalScore !== null ? prevData[level].a : dataCollector[level].a,
     prevOptimalScore

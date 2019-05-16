@@ -7,9 +7,9 @@ import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
 import ScoresWeightsEntityV1, { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import {
-  dataCollectorCandlestickNames,
-  dataCollectorMoveBackNames,
-  dataCollectorOscillatorNames
+  CandlestickIdxs,
+  MoveBackIdxs,
+  OscillatorIdxs
 } from '../Analysis/utils'
 import BinanceApi from '../Binance'
 
@@ -153,9 +153,9 @@ class TradeBot implements ITradeBot {
             symbols: {},
             pairs: {},
             names: {
-              moveBack: dataCollectorMoveBackNames,
-              candlesticks: dataCollectorCandlestickNames,
-              oscillators: dataCollectorOscillatorNames
+              moveBack: MoveBackIdxs,
+              candlesticks: CandlestickIdxs,
+              oscillators: OscillatorIdxs
             },
             market: {}
           })) as ScoresWeightsEntityV1Model

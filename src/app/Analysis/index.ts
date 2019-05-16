@@ -8,7 +8,7 @@ import AnalysisNews from './NewsAnalysis'
 import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { IntervalData, ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
-import { dataCollectorMoveBackNames, dataCollectorCandlestickNames, dataCollectorOscillatorNames } from './utils'
+import { MoveBackIdxs, CandlestickIdxs, OscillatorIdxs } from './utils'
 import { addMachineLearningWeights, MachineLearningData } from './mlWeightUtils'
 import { SMA } from 'technicalindicators'
 import BinanceApi from '../Binance'
@@ -81,16 +81,16 @@ class Analysis implements IAnalysis {
   // todo: user custom (list and weights)
   static readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
-  private readonly initIntervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
+  static readonly initIntervalWeights: number[] = [0.005434783, 0.016304348, 0.027173913, 0.081521739, 0.163043478, 0.326086957, 0.163043478, 0.081521739, 0.054347826, 0.04076087, 0.027173913, 0.013586957]
   private intervalWeights: { [pair: string]: number[] } = {}
-  private readonly initTechAnalysisWeights = {
+  static readonly initTechAnalysisWeights = {
     candlesticks: 0.109,
     oscillators: 0.219,
     moveBack: 0.181,
     cross: 0.256,
     priceChange: 0.235
   }
-  private readonly symbolPieWeights = { tech: 0.5, news: 0.05, markets: 0.45 }
+  static readonly symbolPieWeights = { tech: 0.5, news: 0.05, markets: 0.45 }
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
@@ -114,9 +114,9 @@ class Analysis implements IAnalysis {
 
   public dataCollector: Partial<ScoresWeightsEntityV1Model> = {
     names: {
-      moveBack: dataCollectorMoveBackNames,
-      candlesticks: dataCollectorCandlestickNames,
-      oscillators: dataCollectorOscillatorNames
+      moveBack: MoveBackIdxs,
+      candlesticks: CandlestickIdxs,
+      oscillators: OscillatorIdxs
     }
   }
 
@@ -216,7 +216,7 @@ class Analysis implements IAnalysis {
             this.intervalWeights[pair][Analysis.intervalList.indexOf(interval as CandleChartInterval)] = weight
           })
         } else {
-          this.intervalWeights[pair] = this.initIntervalWeights
+          this.intervalWeights[pair] = Analysis.initIntervalWeights
           this.prevOptimalScore[pair] = this.prevOptimalSMAScore[pair]
         }
       }))
@@ -235,7 +235,7 @@ class Analysis implements IAnalysis {
           this.dataCollector.pairs[pair].a[interval] = {
             w: 0, s: 0, a: {
               tech: {
-                w: this.symbolPieWeights.tech, s: 0, a: {
+                w: Analysis.symbolPieWeights.tech, s: 0, a: {
                   oscillators: { w: 0, s: 0, a: {} },
                   candlesticks: { w: 0, s: 0, a: {} },
                   moveBack: { w: 0, s: 0, a: {} },
@@ -306,7 +306,7 @@ class Analysis implements IAnalysis {
               acc[name] = weight
               return acc
             }, {})
-            : this.initTechAnalysisWeights
+            : Analysis.initTechAnalysisWeights
 
           const techScore = (
             (oscillators * weights['oscillators'])
@@ -317,11 +317,11 @@ class Analysis implements IAnalysis {
           )
 
           techCollector.s = techScore
-          collector.oscillators.w = this.initTechAnalysisWeights.oscillators
-          collector.candlesticks.w = this.initTechAnalysisWeights.candlesticks
-          collector.moveBack.w = this.initTechAnalysisWeights.moveBack
-          collector.cross.w = this.initTechAnalysisWeights.cross
-          collector.priceChange.w = this.initTechAnalysisWeights.priceChange
+          collector.oscillators.w = Analysis.initTechAnalysisWeights.oscillators
+          collector.candlesticks.w = Analysis.initTechAnalysisWeights.candlesticks
+          collector.moveBack.w = Analysis.initTechAnalysisWeights.moveBack
+          collector.cross.w = Analysis.initTechAnalysisWeights.cross
+          collector.priceChange.w = Analysis.initTechAnalysisWeights.priceChange
 
           intervalCollector.s = techScore
           intervalCollector.w = this.intervalWeights[pair][intervalIdx]
@@ -452,20 +452,20 @@ class Analysis implements IAnalysis {
       const newsScore = this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]
       this.dataCollector.symbols[symbol] = {
         news: {
-          w: this.symbolPieWeights.news,
+          w: Analysis.symbolPieWeights.news,
           s: newsScore
         }
       }
 
       const marketSymbol = this.marketSymbols.includes(symbol) ? symbol : 'ALTS'
       this.dataCollector.market[marketSymbol] = {
-        w: this.symbolPieWeights.markets,
+        w: Analysis.symbolPieWeights.markets,
         s: this.marketScore[marketSymbol].battleScore
       }
 
-      this.symbolTotals[symbol] += this.marketScore[marketSymbol].battleScore * this.symbolPieWeights.markets
-      this.symbolTotals[symbol] += this.techSymbolScore[symbol] * this.symbolPieWeights.tech
-      this.symbolTotals[symbol] += newsScore * this.symbolPieWeights.news
+      this.symbolTotals[symbol] += this.marketScore[marketSymbol].battleScore * Analysis.symbolPieWeights.markets
+      this.symbolTotals[symbol] += this.techSymbolScore[symbol] * Analysis.symbolPieWeights.tech
+      this.symbolTotals[symbol] += newsScore * Analysis.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     }
 

@@ -42,39 +42,41 @@ export interface CandleStickData {
   }
 }
 
-export interface IntervalData {
-  [interval: string]: {
-    w: number
-    s: number
-    a: {
-      tech: {
-        w: number
-        s: number
-        a: {
-          oscillators: {
-            w: number
-            s: number
-            a: OscillatorSW
-          }
-          candlesticks: {
-            w: number
-            s: number
-            a: CandleStickData
-          }
-          moveBack: {
-            w: number
-            s: number
-            a: MoveBackSW
-          }
-          cross: CrossSW
-          priceChange: {
-            w: number
-            s: number
-          }
+export interface IntervalDataSWA {
+  w: number
+  s: number
+  a: {
+    tech: {
+      w: number
+      s: number
+      a: {
+        oscillators: {
+          w: number
+          s: number
+          a: OscillatorSW
+        }
+        candlesticks: {
+          w: number
+          s: number
+          a: CandleStickData
+        }
+        moveBack: {
+          w: number
+          s: number
+          a: MoveBackSW
+        }
+        cross: CrossSW
+        priceChange: {
+          w: number
+          s: number
         }
       }
     }
   }
+}
+
+export interface IntervalData {
+  [interval: string]: IntervalDataSWA
 }
 
 export interface PairData {
