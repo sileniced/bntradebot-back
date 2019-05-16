@@ -64,7 +64,11 @@ class BinanceApi {
     this.activeTradeBotUserIds.forEach(id => {
 
       this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      this.prevTradeBot[id].run(this).catch(console.error)
+      this.prevTradeBot[id].run()
+      .catch((e) => {
+        console.error(e)
+        throw e
+      })
     })
 
 

@@ -60,16 +60,16 @@ const run = (
 ) => {
 
   const bullishArr = prevOptimalScore
-    ? addMachineLearningWeights(prevOptimalScore, bullish.map(([name]) => ({
+    ? addMachineLearningWeights(prevOptimalScore, bullish.map(([name]): MachineLearningData => ({
       name,
       prevData: prevData.bullish[dataCollectorCandlestickNames.bullish[name]]
     }))).map(([name, weight], idx) => [name, bullish[idx][1], weight])
     : addEVENWeight(bullish)
 
   const bearishArr = prevOptimalScore
-    ? addMachineLearningWeights(1 - prevOptimalScore, bearish.map(([name]) => ({
+    ? addMachineLearningWeights(1 - prevOptimalScore, bearish.map(([name]): MachineLearningData => ({
       name,
-      prevData: prevData.bullish[dataCollectorCandlestickNames.bearish[name]]
+      prevData: prevData.bearish[dataCollectorCandlestickNames.bearish[name]]
     }))).map(([name, weight], idx) => [name, bearish[idx][1], weight])
     : addEVENWeight(bearish)
 

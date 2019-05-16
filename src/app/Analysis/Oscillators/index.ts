@@ -4,7 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { OscillatorSW } from '../../../entities/ScoresWeightsEntityV1'
 import { addScores, dataCollectorOscillatorNames } from '../utils'
-import { addEVENWeight, addMachineLearningWeights } from '../mlWeightUtils'
+import { addEVENWeight, addMachineLearningWeights, MachineLearningData } from '../mlWeightUtils'
 
 export default (
   data: StockData,
@@ -14,7 +14,7 @@ export default (
 ) => {
 
   const oscillatorsList = prevOptimalScore !== null
-    ? addMachineLearningWeights(prevOptimalScore, Object.keys(settings).map(name => ({
+    ? addMachineLearningWeights(prevOptimalScore, Object.keys(settings).map((name): MachineLearningData => ({
       name,
       prevData: prevData[dataCollectorOscillatorNames[name]]
     })), false)

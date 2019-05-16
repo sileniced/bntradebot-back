@@ -4,7 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsEntityV1'
 import { addScores, dataCollectorMoveBackNames } from '../utils'
-import { addMachineLearningWeights, addNAIVEWeight } from '../mlWeightUtils'
+import { addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from '../mlWeightUtils'
 
 export default (
   data: StockData,
@@ -16,14 +16,24 @@ export default (
 ) => {
 
   const emaMovingAveragesList: [string, number][] = prevOptimalScore !== null
-    ? addMachineLearningWeights(prevOptimalScore, settings.EMA.periods.map(period => ({
-      name: `EMA${period}`,
-      prevData: prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
-    })))
+    ? addMachineLearningWeights(prevOptimalScore, settings.EMA.periods.map((period): MachineLearningData => {
+      const prevData = prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
+      if (!prevData) {
+        console.error(prevData)
+        console.error(prevMoveBackData)
+        console.error(`EMA${period}`)
+        console.error(dataCollectorMoveBackNames[`EMA${period}`])
+        throw 'NO PREVDATA WHY'
+      }
+      return {
+        name: `EMA${period}`,
+        prevData
+      }
+    }))
     : addNAIVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
 
   const smaMovingAveragesList: [string, number][] = prevOptimalScore !== null
-    ? addMachineLearningWeights(prevOptimalScore, settings.SMA.periods.map(period => ({
+    ? addMachineLearningWeights(prevOptimalScore, settings.SMA.periods.map((period): MachineLearningData => ({
       name: `SMA${period}`,
       prevData: prevMoveBackData[dataCollectorMoveBackNames[`SMA${period}`]]
     })))

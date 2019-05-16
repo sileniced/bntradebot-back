@@ -80,4 +80,7 @@ setupDb().then(() => {
     })
   })
 })
-.catch((err) => console!.error(err))
+.catch((err) => {
+  console!.error(err)
+  throw err
+})
