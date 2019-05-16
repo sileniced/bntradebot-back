@@ -16,10 +16,20 @@ export default (
 ) => {
 
   const emaMovingAveragesList: [string, number][] = prevOptimalScore !== null
-    ? addMachineLearningWeights(prevOptimalScore, settings.EMA.periods.map((period): MachineLearningData => ({
-      name: `EMA${period}`,
-      prevData: prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
-    })))
+    ? addMachineLearningWeights(prevOptimalScore, settings.EMA.periods.map((period): MachineLearningData => {
+      const prevData = prevMoveBackData[dataCollectorMoveBackNames[`EMA${period}`]]
+      if (!prevData) {
+        console.error(prevData)
+        console.error(prevMoveBackData)
+        console.error(`EMA${period}`)
+        console.error(dataCollectorMoveBackNames[`EMA${period}`])
+        throw 'NO PREVDATA WHY'
+      }
+      return {
+        name: `EMA${period}`,
+        prevData
+      }
+    }))
     : addNAIVEWeight(settings.EMA.periods.map(period => [`EMA${period}`]))
 
   const smaMovingAveragesList: [string, number][] = prevOptimalScore !== null
