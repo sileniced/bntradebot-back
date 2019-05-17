@@ -18,6 +18,7 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
+import { PairData } from '../entities/ScoresWeightsEntityV1'
 // import TradeBotEntity from '../entities/TradeBotEntity'
 // import { Raw } from 'typeorm'
 
@@ -56,21 +57,30 @@ class BinanceApi {
     globalTradeInterval: 1000 * 60 * 10 /*10000*/
   }
 
-  private prevTradeBot: { [userId: number]: TradeBot } = {}
+  private prevPairData: { [pair: string]: PairData } = {}
+  // private prevTradeBot: { [userId: number]: TradeBot } = {}
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
 
     this.activeTradeBotUserIds.forEach(id => {
 
-      this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      this.prevTradeBot[id].run(this)
-      .catch((e) => {
-        console.error(e)
-        throw e
-      })
-    })
+      // this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
+      // this.prevTradeBot[id].run(this)
+      // .catch((e) => {
+      //   console.error(e)
+      //   throw e
+      // })
 
+      new TradeBot(this.activeTradeBotUsers[id], this.prevPairData).run(this)
+      .then(({ prevPairData, prevPairs }) => {
+        prevPairs.forEach(pair => {
+          this.prevPairData[pair] = prevPairData[pair]
+        })
+      })
+
+
+    })
 
 
     // TradeBotEntity.find({
@@ -138,7 +148,7 @@ class BinanceApi {
     const options: CandlesOptions = {
       symbol,
       interval,
-      limit,
+      limit
     }
     if (endTime) options.endTime = endTime
     return this.api.candles(options)

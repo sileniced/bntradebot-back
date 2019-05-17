@@ -96,7 +96,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
   // private show = true
 
   private trainingExecute = async (): Promise<void> => {
-    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-6)
+    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-5)
     const now = Date.now() - (1000 * 60 * 10)
 
     let history = {}
@@ -447,7 +447,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
     await Promise.all(pairWeightsPromises)
 
     // this.trainingExecute().catch(console.error)
-    setInterval(this.trainingExecute, 6000)
+    setInterval(this.trainingExecute, 12000)
   }
 
 }
