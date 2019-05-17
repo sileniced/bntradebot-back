@@ -2,10 +2,12 @@ import User from '../entities/User'
 
 import { Symbol } from 'binance-api-node'
 import {
+  CandleStickBullBear,
   CandleStickData,
-  CandleStickBullBear, CandleStickLevelSW,
+  CandleStickLevelSW,
   IntervalData,
-  IntervalDataSWA, OscillatorSW,
+  IntervalDataSWA,
+  OscillatorSW,
   PairData,
   TechAnalysis
 } from '../entities/ScoresWeightsEntityV1'
@@ -18,9 +20,11 @@ import oscillatorsSettings from './Analysis/Oscillators/settings'
 import { CandlestickIdxs, CandlestickNames, MoveBackIdxs, OscillatorIdxs, OscillatorNames } from './Analysis/utils'
 import {
   bearish,
-  bullish, calcScore,
-  CandleStickAnalysisML, CandleStickLevels,
-  settings as candleSticksSettings, sigmoid
+  bullish,
+  calcScore,
+  CandleStickAnalysisML,
+  CandleStickLevels,
+  sigmoid
 } from './Analysis/CandleStickAnalysis'
 import movingAveragesSettings from './Analysis/MovingAverages/settings'
 import { MovingAveragesML } from './Analysis/MovingAverages'
