@@ -19,7 +19,7 @@ export interface OscillatorSW {
   }
 }
 
-export interface CandleStickSW {
+export interface CandleStickBullBear {
   bullish: {
     [bullishNumber: number]: {
       w: number
@@ -34,11 +34,36 @@ export interface CandleStickSW {
   }
 }
 
+export interface CandleStickLevelSW {
+  w: number
+  s: number
+  a: CandleStickBullBear
+}
+
 export interface CandleStickData {
-  [depthLevelNumber: number]: {
+  [depthLevelNumber: number]: CandleStickLevelSW
+}
+
+export interface TechAnalysis {
+  oscillators: {
     w: number
     s: number
-    a: CandleStickSW
+    a: OscillatorSW
+  }
+  candlesticks: {
+    w: number
+    s: number
+    a: CandleStickData
+  }
+  moveBack: {
+    w: number
+    s: number
+    a: MoveBackSW
+  }
+  cross: CrossSW
+  priceChange: {
+    w: number
+    s: number
   }
 }
 
@@ -49,28 +74,7 @@ export interface IntervalDataSWA {
     tech: {
       w: number
       s: number
-      a: {
-        oscillators: {
-          w: number
-          s: number
-          a: OscillatorSW
-        }
-        candlesticks: {
-          w: number
-          s: number
-          a: CandleStickData
-        }
-        moveBack: {
-          w: number
-          s: number
-          a: MoveBackSW
-        }
-        cross: CrossSW
-        priceChange: {
-          w: number
-          s: number
-        }
-      }
+      a: TechAnalysis
     }
   }
 }

@@ -1,23 +1,26 @@
 import User from '../entities/User'
 
 import { Symbol } from 'binance-api-node'
-import { CandleStickSW, IntervalData, IntervalDataSWA, PairData } from '../entities/ScoresWeightsEntityV1'
+import {
+  CandleStickData,
+  CandleStickBullBear, CandleStickLevelSW,
+  IntervalData,
+  IntervalDataSWA, OscillatorSW,
+  PairData,
+  TechAnalysis
+} from '../entities/ScoresWeightsEntityV1'
 import BinanceApi from './Binance'
 import StockData from 'technicalindicators/declarations/StockData'
 import Analysis from './Analysis'
 import PairWeightsEntityV1 from '../entities/PairWeightsEntityV1'
-import { addEVENWeight, addNAIVEWeight } from './Analysis/mlWeightUtils'
+import { addEVENWeight, addNAIVEWeight, calcWeight } from './Analysis/mlWeightUtils'
 import oscillatorsSettings from './Analysis/Oscillators/settings'
-import {
-  CandlestickIdxs,
-  MoveBackIdxs,
-  OscillatorIdxs
-} from './Analysis/utils'
+import { CandlestickIdxs, CandlestickNames, MoveBackIdxs, OscillatorIdxs, OscillatorNames } from './Analysis/utils'
 import {
   bearish,
-  bullish,
-  CandleStickAnalysisML,
-  settings as candleSticksSettings
+  bullish, calcScore,
+  CandleStickAnalysisML, CandleStickLevels,
+  settings as candleSticksSettings, sigmoid
 } from './Analysis/CandleStickAnalysis'
 import movingAveragesSettings from './Analysis/MovingAverages/settings'
 import { MovingAveragesML } from './Analysis/MovingAverages'
@@ -131,33 +134,112 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
     // first get the scores with the current weights
     // use the prevOptimalScore to change the current weights to new weights
 
+
     const techAnalysisPromises: Promise<void>[] = []
     selectedPairs.forEach(pair => {
-      Analysis.intervalList.forEach(interval => {
+      const optimalScore = this.activePairs[pair].weights.o
+        Analysis.intervalList.forEach(interval => {
         techAnalysisPromises.push(this.Binance.getCandlesStockData(pair, interval, 200, history[pair])
         .then((candles: StockData) => {
 
-          const techCollector = this.activePairs[pair].weights.a[interval].a.tech.a
+          const techAnalysis: TechAnalysis = this.activePairs[pair].weights.a[interval].a.tech.a
 
           MovingAveragesML(
             candles,
-            techCollector.moveBack.a,
-            techCollector.cross,
+            techAnalysis.moveBack.a,
+            techAnalysis.cross,
           )
 
-          OscillatorsML(
+
+          techAnalysis.priceChange.s = PriceChangeAnalysis(candles)
+          techAnalysis.priceChange.w = calcWeight(
+            techAnalysis.priceChange.s,
+            techAnalysis.priceChange.w,
+            optimalScore
+          )
+
+          // Oscillators
+          const oscillatorData: OscillatorSW = OscillatorsML(
             candles,
-            techCollector.oscillators.a
+            techAnalysis.oscillators.a
           )
 
-          CandleStickAnalysisML(
+          const oscillatorTotalWeights = OscillatorNames.reduce((acc, name) => {
+            let data = oscillatorData[OscillatorIdxs[name]]
+            data.w = calcWeight(data.s, data.w, optimalScore)
+            return acc + data.w
+          }, 0)
+
+          techAnalysis.oscillators.s = OscillatorNames.reduce((acc, name) => {
+            let data = oscillatorData[OscillatorIdxs[name]]
+            data.w /= oscillatorTotalWeights
+            return acc + (data.s * data.w)
+          }, 0)
+
+          techAnalysis.oscillators.w = calcWeight(
+            techAnalysis.oscillators.s,
+            techAnalysis.oscillators.w,
+            optimalScore
+          )
+
+          // candleSticks
+          const candleStickData: CandleStickData = CandleStickAnalysisML(
             candles,
-            techCollector.candlesticks.a
+            techAnalysis.candlesticks.a
           )
 
-          techCollector.priceChange.s = PriceChangeAnalysis(candles)
+          const candleStickLevelTotalWeights = CandleStickLevels.reduce((acc, level) => {
+            let levelData: CandleStickLevelSW = candleStickData[level[0]]
 
-          console.log('techCollector = ', pair, techCollector)
+            const bullishTotalWeights = CandlestickNames.bullish.reduce((acc, name) => {
+              let data = levelData.a.bullish[CandlestickIdxs.bullish[name]]
+              data.w = calcWeight(data.s ? 0.51 : 0, data.w, optimalScore)
+              return acc + data.w
+            }, 0)
+
+            const bullishScore = CandlestickNames.bullish.reduce((acc, name) => {
+              let data = levelData.a.bullish[CandlestickIdxs.bullish[name]]
+              data.w /= bullishTotalWeights
+              acc.score += data.w * sigmoid(acc.count, CandlestickNames.bullish.length)
+              return acc
+            }, {
+              score: 0,
+              count: 0
+            }).score
+            
+            const bearishTotalWeights = CandlestickNames.bearish.reduce((acc, name) => {
+              let data = levelData.a.bearish[CandlestickIdxs.bearish[name]]
+              data.w = calcWeight(data.s ? 0.51 : 0, data.w, 1 - optimalScore)
+              return acc + data.w
+            }, 0)
+
+            const bearishScore = CandlestickNames.bearish.reduce((acc, name) => {
+              let data = levelData.a.bearish[CandlestickIdxs.bearish[name]]
+              data.w /= bearishTotalWeights
+              acc.score += data.s ? data.w * sigmoid(acc.count, CandlestickNames.bearish.length) : 0
+              acc.count += data.s
+              return acc
+            }, {
+              score: 0,
+              count: 0
+            }).score
+
+            levelData.s = calcScore(bullishScore, bearishScore)
+            levelData.w = calcWeight(levelData.s, levelData.w, optimalScore)
+            return acc + levelData.w
+          }, 0)
+
+          techAnalysis.candlesticks.s = CandleStickLevels.reduce((acc, level) => {
+            let data: CandleStickLevelSW = candleStickData[level[0]]
+            data.w /= candleStickLevelTotalWeights
+            return acc + (data.s * data.w)
+          }, 0)
+
+          techAnalysis.candlesticks.w = calcWeight(
+            techAnalysis.candlesticks.s,
+            techAnalysis.candlesticks.w,
+            optimalScore
+          )
 
         })
         .catch((e) => {
@@ -166,6 +248,9 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
         }))
       })
     })
+
+
+
   }
 
   private getInitWeights = (pair): IntervalData => {
@@ -192,7 +277,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
               candlesticks: {
                 w: Analysis.initTechAnalysisWeights.candlesticks,
                 s: 0,
-                a: addNAIVEWeight(Array(candleSticksSettings.depth).fill(null).map((_, level) => [level])).reduce((acc, [level, weight]) => {
+                a: addNAIVEWeight(CandleStickLevels).reduce((acc, [level, weight]) => {
                   acc[level] = {
                     w: weight,
                     s: 0,
@@ -211,7 +296,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
                         }
                         return acc
                       }, {})
-                    } as CandleStickSW
+                    } as CandleStickBullBear
                   }
                   return acc
                 }, {})

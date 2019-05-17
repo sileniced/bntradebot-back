@@ -18,6 +18,8 @@ export const OscillatorsML = (
   oscillatorsNumbers.forEach(oscillatorsNumber => {
     oscillatorSW[oscillatorsNumber].s = scoring[OscillatorNames[oscillatorsNumber]]()
   })
+
+  return oscillatorSW
 }
 
 export default (

@@ -1,6 +1,6 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
-import { CandleStickData, CandleStickSW } from '../../entities/ScoresWeightsEntityV1'
+import { CandleStickData, CandleStickBullBear } from '../../entities/ScoresWeightsEntityV1'
 import { CandlestickIdxs, CandlestickNames } from './utils'
 import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from './mlWeightUtils'
 
@@ -49,8 +49,8 @@ const sliceStockData = (data: StockData, last: number): StockData => ({
   low: data.low.slice(-last)
 })
 
-const sigmoid = (count, length) => (2 - ((2 * count) / length))
-const calcScore = (bullish, bearish) => 0.5 + (bullish / 2) - (bearish / 2)
+export const sigmoid = (count, length) => (2 - ((2 * count) / length))
+export const calcScore = (bullish, bearish) => 0.5 + (bullish / 2) - (bearish / 2)
 
 const DataLast = (data: StockData) => ({
   [1]: sliceStockData(data, 1),
@@ -61,8 +61,8 @@ const DataLast = (data: StockData) => ({
 
 const run = (
   data: StockData,
-  dataCollector: CandleStickSW,
-  prevData: CandleStickSW,
+  dataCollector: CandleStickBullBear,
+  prevData: CandleStickBullBear,
   prevOptimalScore: number | null
 ) => {
 
@@ -130,6 +130,8 @@ const ShortenStockData = (data: StockData, length: number): StockData => ({
   low: data.low.slice(0, length)
 })
 
+export const CandleStickLevels = Array(settings.depth).fill(null).map((_, level) => [level])
+
 export const CandleStickAnalysisML = (
   stockData: StockData,
   candleStickData: CandleStickData
@@ -153,6 +155,7 @@ export const CandleStickAnalysisML = (
     
   })
 
+  return candleStickData
 }
 
 export default (
@@ -190,7 +193,7 @@ export default (
     const prevDataEntries = Object.entries(prevData) as [string, {
       w: number
       /** trick is to turn that :a: into an :s: */
-      a: CandleStickSW
+      a: CandleStickBullBear
     }][]
 
     const machineLearningData: MachineLearningData[] = prevDataEntries.map(([level, { w, a: { bullish, bearish } }]) => {
