@@ -163,7 +163,6 @@ class Analysis implements IAnalysis {
 
     this.dataCollector.pairs = {}
 
-
     const prevOptimalSMAScorePromises: Promise<void>[] = []
 
     /** this.prevOptimalScore[pair] = */
@@ -374,9 +373,25 @@ class Analysis implements IAnalysis {
       })
     })
 
-    this.marketSymbols.forEach(quoteSymbol => {
+    this.marketSymbols
+    .sort((quoteSymbolA, quoteSymbolB) => {
+      if (this.marketScore[quoteSymbolA].battleWins === this.marketScore[quoteSymbolB].battleWins) {
+        return this.marketScore[quoteSymbolA].score - this.marketScore[quoteSymbolB].score
+      }
+      return this.marketScore[quoteSymbolA].battleWins - this.marketScore[quoteSymbolB].battleWins
+    })
+    .forEach((quoteSymbol, idx, src) => {
       const { battleWins, battleScore } = this.marketScore[quoteSymbol]
       this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
+      if (this.marketScore[quoteSymbol].battleScore !== 0 && src[idx + 1]) {
+        const nextMarket = this.marketScore[src[idx + 1]]
+        if (nextMarket.battleWins > battleWins) {
+          const stolenScore = this.marketScore[quoteSymbol].battleScore * Math.pow(battleWins / nextMarket.battleWins, 2)
+          this.marketScore[quoteSymbol].battleScore -= stolenScore
+          this.marketScore[src[idx + 1]].battleScore += stolenScore
+        }
+      }
+
     })
 
     for (let i = 0; i < qen; i++) {

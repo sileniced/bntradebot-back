@@ -81,7 +81,7 @@ class TradeBot implements ITradeBot {
   private dollarDiff: number
 
   private readonly prevTradeBot: TradeBot | undefined
-  private prevOptimalScore: { [pair: string]: number | null } = {}
+  private prevOptimalPriceChangeScore: { [pair: string]: number | null } = {}
   private readonly getScoresWeightPromise: () => Promise<ScoresWeightsEntityV1Model | null> | null
 
   constructor(user: User, prevTradeBot: TradeBot | undefined) {
@@ -99,7 +99,9 @@ class TradeBot implements ITradeBot {
       where: { user: this.user.id },
       order: { tradeTime: 'DESC' },
       relations: ['scoresWeightsV1']
-    }).then((tradeBot: TradeBotEntity[]) => tradeBot[0].scoresWeightsV1.scoresWeights)
+    }).then((tradeBot: TradeBotEntity[]) => {
+      return tradeBot[0] ? tradeBot[0].scoresWeightsV1.scoresWeights : null
+    })
 
   }
 
@@ -125,7 +127,7 @@ class TradeBot implements ITradeBot {
     const balancePromise = Binance.getAccountBalances(this.user.id)
 
     let scoresWeight
-    const scoresWeightPromise = !this.prevTradeBot ? this.getScoresWeightPromise() : null
+    const scoresWeightPromise = !this.prevTradeBot ? await this.getScoresWeightPromise() : null
 
     await Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
       this.prices[pair.symbol] = price
@@ -133,13 +135,13 @@ class TradeBot implements ITradeBot {
         const change = (price - this.prevTradeBot.prices[pair.symbol]) / this.prevTradeBot.prices[pair.symbol]
         if (change > 0) {
           const quote = Math.sqrt(change)
-          this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 1 : 0.5 + quote
+          this.prevOptimalPriceChangeScore[pair.symbol] = quote > 0.5 ? 1 : 0.5 + quote
         } else {
           const quote = Math.sqrt(-change)
-          this.prevOptimalScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
+          this.prevOptimalPriceChangeScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
         }
       } else {
-        this.prevOptimalScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
+        this.prevOptimalPriceChangeScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
       }
     })))
 
@@ -153,7 +155,7 @@ class TradeBot implements ITradeBot {
     this.analysis = new Analysis({
       pairsInfo: this.pairsInfo,
       getNormalizedSymbols: this.getNormalizedSymbols,
-      prevOptimalScore: this.prevOptimalScore,
+      prevOptimalScore: this.prevOptimalPriceChangeScore,
       prevData: (this.prevTradeBot
         ? this.prevTradeBot.analysis.dataCollector
         : (scoresWeight
@@ -210,7 +212,7 @@ class TradeBot implements ITradeBot {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
       /** DEV HERE*/
-      this.tradePromises.push(Binance.newOrder/*Test*/(this.user, pair.feeDollar, {
+      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),
@@ -254,7 +256,7 @@ class TradeBot implements ITradeBot {
     this.entity.prevOptimalScorePair = this.analysis.prevOptimalScore
     this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
-      acc[market] = this.analysis.marketScore[market].score
+      acc[market] = this.analysis.marketScore[market].battleScore
       return acc
     }, {})
 
