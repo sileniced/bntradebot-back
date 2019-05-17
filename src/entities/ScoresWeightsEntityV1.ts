@@ -1,7 +1,7 @@
 import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
 export interface MoveBackSW {
-  [maLengthNumber: number]: {
+  [maLengthIdx: number]: {
     w: number
     s: number
   }
@@ -13,7 +13,7 @@ export interface CrossSW {
 }
 
 export interface OscillatorSW {
-  [oscilatorNumber: number]: {
+  [oscilatorIdx: number]: {
     w: number
     s: number
   }
@@ -21,13 +21,13 @@ export interface OscillatorSW {
 
 export interface CandleStickBullBear {
   bullish: {
-    [bullishNumber: number]: {
+    [bullishIdx: number]: {
       w: number
       s: number
     }
   }
   bearish: {
-    [bearishNumber: number]: {
+    [bearishIdx: number]: {
       w: number
       s: number
     }
@@ -41,7 +41,7 @@ export interface CandleStickLevelSW {
 }
 
 export interface CandleStickData {
-  [depthLevelNumber: number]: CandleStickLevelSW
+  [depthLevelIdx: number]: CandleStickLevelSW
 }
 
 export interface TechAnalysis {

@@ -1,6 +1,6 @@
 import setupDb from './db'
 import BinanceApi from './app/Binance'
-import MachineLearningTrainer from './app/MachineLearningTrainer'
+import MachineLearningTrainer from './app/Analysis/MachineLearning/MachineLearningTrainer'
 
 export const BinanceML = new BinanceApi()
 

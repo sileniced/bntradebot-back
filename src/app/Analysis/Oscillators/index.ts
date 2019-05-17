@@ -10,13 +10,13 @@ export const OscillatorsML = (
   stockData: StockData,
   oscillatorSW: OscillatorSW,
 ) => {
-  const oscillatorsNumbers = Object.keys(oscillatorSW)
+  const oscillatorsIdxs = Object.keys(oscillatorSW)
 
   const values = Values(stockData)
   const scoring = Scoring(values)
 
-  oscillatorsNumbers.forEach(oscillatorsNumber => {
-    oscillatorSW[oscillatorsNumber].s = scoring[OscillatorNames[oscillatorsNumber]]()
+  oscillatorsIdxs.forEach(oscillatorsIdx => {
+    oscillatorSW[oscillatorsIdx].s = scoring[OscillatorNames[oscillatorsIdx]]()
   })
 
   return oscillatorSW

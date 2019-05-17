@@ -1,3 +1,5 @@
+import movingAveragesSettings from './MovingAverages/settings'
+
 export const MoveBackIdxs = {
   'EMA10': 0,
   'EMA20': 1,
@@ -12,6 +14,9 @@ export const MoveBackIdxs = {
 }
 
 export const MoveBackNames = Object.keys(MoveBackIdxs)
+
+export const EmaMoveBackNames = movingAveragesSettings.EMA.periods.map(period => [`EMA${period}`])
+export const SmaMoveBackNames = movingAveragesSettings.SMA.periods.map(period => [`SMA${period}`])
 
 export const CandlestickIdxs = {
   bullish: {

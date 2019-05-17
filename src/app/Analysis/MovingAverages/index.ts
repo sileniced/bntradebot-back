@@ -11,17 +11,19 @@ export const MovingAveragesML = (
   moveBackSW: MoveBackSW,
   crossSW: CrossSW
 ) => {
-  const maLengthNumbers = Object.keys(moveBackSW)
+  const maLengthIdxs = Object.keys(moveBackSW)
 
   const values = Values(stockData)
   const close = stockData.close.slice(-1)[0]
   const scoring = Scoring(close, values)
 
-  maLengthNumbers.forEach(maLengthNumber => {
-    moveBackSW[maLengthNumber].s = scoring[MoveBackNames[maLengthNumber]]
+  maLengthIdxs.forEach(maLengthIdx => {
+    moveBackSW[maLengthIdx].s = scoring[MoveBackNames[maLengthIdx]]._score
   })
 
   crossSW.s = CrossScore(values)
+
+  return moveBackSW
 }
 
 const CrossScore = ({ SMA, EMA }) => {
