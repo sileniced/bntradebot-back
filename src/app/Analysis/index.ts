@@ -10,6 +10,7 @@ import Logger from '../Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
 import { numShort } from '../../services/utils'
+import MarketAnalysis, { MarketScore } from './MarketAnalysis'
 
 export interface AssignedPair {
   pair: string,
@@ -23,21 +24,13 @@ export interface AnalysisInput {
   getNormalizedSymbols: () => { [symbol: string]: number }
 }
 
-export interface MarketAnalysisResult {
-  quoteSymbol: string,
-  score: number,
-  multiplier: number
-  poweredScore: number
-  battleScore: number
-}
-
 export interface IAnalysis {
   run(logger: Logger): Promise<void>,
 
   techPairScore: { [pair: string]: number }
   techSymbolScore: { [symbol: string]: number }
 
-  marketScore: { [quoteSymbol: string]: MarketAnalysisResult }
+  marketScore: MarketScore
   marketSymbolScore: { [symbol: string]: number }
 
   assignedPair: { [pair: string]: AssignedPair }
@@ -72,7 +65,7 @@ class Analysis implements IAnalysis {
   public techPairScore: { [pair: string]: number } = {}
   public techSymbolScore: { [symbol: string]: number } = {}
 
-  public marketScore: { [quoteSymbol: string]: MarketAnalysisResult } = {}
+  public marketScore: MarketScore = {}
   public marketSymbolScore: { [symbol: string]: number } = {}
   public marketPairCollectorScore: { [pair: string]: number } = {}
 
@@ -105,14 +98,6 @@ class Analysis implements IAnalysis {
     this.marketSymbolScore = getNormalizedSymbols()
     this.symbolPie = getNormalizedSymbols()
     this.symbolTotals = getNormalizedSymbols()
-
-    this.marketScore['ALTS'] = {
-      quoteSymbol: 'ALTS',
-      score: 0,
-      multiplier: 0,
-      poweredScore: 0,
-      battleScore: 0
-    }
 
     const quoteSymbols = Object.entries(pairsInfo.map(pair => pair.quoteAsset)
     .reduce((acc, quoteSymbol) => {
@@ -209,64 +194,7 @@ class Analysis implements IAnalysis {
     this.apiCalls = techAnalysisPromises.length
 
     /** this.marketScore[quoteSymbol | altsMarket] = */
-    const qen = this.marketSymbols.length
-    for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.marketSymbols[i]
-
-      const [baseScore, quoteScore] = this.pairsPerSymbol[quoteSymbol]
-      .filter(pair => pair.quoteAsset === quoteSymbol)
-      .reduce((acc, pair, _, src) => {
-        const quoteScore = -(this.techPairScore[pair.symbol] - 0.5) * 2
-        return quoteScore < 0
-          ? [acc[0] - quoteScore / src.length, acc[1]]
-          : [acc[0], acc[1] + quoteScore / src.length]
-      }, [0, 0])
-
-      /*
-      todo: HIER MOET NOG IETS: de quote symbols need to battle it out
-
-      Als market1 het sterker doet dan market2,
-      en een symbol wordt vergeleken met market2,
-      moet het eerst kijken naar market1.
-       */
-
-      const quoteMultiplier = Math.sqrt(quoteScore)
-      const baseMultiplier = Math.sqrt(baseScore)
-
-      this.marketScore[quoteSymbol] = {
-        quoteSymbol,
-        score: quoteScore,
-        multiplier: quoteMultiplier,
-        poweredScore: quoteScore + quoteMultiplier,
-        battleScore: quoteScore + quoteMultiplier
-      }
-
-      this.marketScore['ALTS'].score += baseScore / qen
-      this.marketScore['ALTS'].multiplier += baseMultiplier / qen
-      this.marketScore['ALTS'].poweredScore += baseScore + baseMultiplier / qen
-      this.marketScore['ALTS'].battleScore += baseScore + baseMultiplier / qen
-
-    }
-
-    for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.marketSymbols[i]
-      this.pairsPerSymbol[quoteSymbol]
-      .filter(pair => this.marketSymbols.includes(pair.baseAsset) && pair.quoteAsset === quoteSymbol)
-      .forEach(pair => {
-
-        this.marketScore[pair.baseAsset].battleScore = this.marketScore[pair.baseAsset].poweredScore
-        this.marketScore[pair.quoteAsset].battleScore = this.marketScore[pair.quoteAsset].poweredScore
-
-        const baseTechScore = (this.techPairScore[pair.symbol] - 0.5) * 2
-        this.marketScore[pair.baseAsset].battleScore += baseTechScore
-        this.marketScore[pair.quoteAsset].battleScore -= baseTechScore
-      })
-    }
-
-    for (let i = 0; i < qen; i++) {
-      const quoteSymbol = this.marketSymbols[i]
-      this.marketScore[quoteSymbol].battleScore = this.marketScore[quoteSymbol].battleScore < 0 ? 0 : this.marketScore[quoteSymbol].battleScore
-    }
+    this.marketScore = MarketAnalysis(this.marketSymbols, this.pairsPerSymbol, this.techPairScore)
 
     // for (let i = 0; i < qen; i++) {
       // logger.addMarketAnalysis(this.marketScore[this.marketSymbols[i]])
