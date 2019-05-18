@@ -59,7 +59,7 @@ class TradeBotEntity extends BaseEntity {
   public symbols: string[]
 
   @Column('simple-array')
-  public pairs: string[]
+  public pairs: string[] = []
 
   @Column('simple-array')
   public markets: string[]

@@ -13,6 +13,7 @@ import {
 } from '../Analysis/utils'
 import BinanceApi from '../Binance'
 import PairWeightsEntityV1 from '../../entities/PairWeightsEntityV1'
+import MachineLearningTrainer from '../Analysis/MachineLearning/MachineLearningTrainer'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -103,7 +104,9 @@ class TradeBot implements ITradeBot {
     //   where: { user: this.user.id },
     //   order: { tradeTime: 'DESC' },
     //   relations: ['scoresWeightsV1']
-    // }).then((tradeBot: TradeBotEntity[]) => tradeBot[0].scoresWeightsV1.scoresWeights)
+    // }).then((tradeBot: TradeBotEntity[]) => {
+    //       return tradeBot[0] ? tradeBot[0].scoresWeightsV1.scoresWeights : null
+    //     })
 
   }
 
@@ -126,10 +129,10 @@ class TradeBot implements ITradeBot {
 
     await Binance.getPairs().then(pairInfo => {
       this.pairsInfo = pairInfo.filter(pair => this.user.symbols.includes(pair.baseAsset) && this.user.symbols.includes(pair.quoteAsset))
-      this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
-      this.prevPairData = this.pairsInfo.reduce((acc, pair) => {
-        acc[pair.symbol] = this.prevPairData[pair.symbol]
-        pairDataPromises.push(PairWeightsEntityV1.find({ where: {pairName: pair.symbol }})
+
+      this.pairsInfo.forEach(pair => {
+        this.entity.pairs.push(pair.symbol)
+        pairDataPromises.push(PairWeightsEntityV1.find({ where: { pairName: pair.symbol } })
         .then((pairData: PairWeightsEntityV1[]) => {
           this.pairData[pair.symbol] = {
             a: pairData[0].weights,
@@ -137,11 +140,77 @@ class TradeBot implements ITradeBot {
             o: 0.5
           }
         }))
+      })
+
+      /* overwriting to remove irrelevant pairs */
+      this.prevPairData = this.pairsInfo.reduce((acc, pair) => {
+        acc[pair.symbol] = this.prevPairData[pair.symbol]
         return acc
       }, {})
+
     })
 
-    await pairDataPromises
+    await Promise.all(pairDataPromises)
+
+    const pairWeightsPromises: Promise<PairData>[] = this.pairsInfo.map(pair => {
+      if (this.prevPairData[pair.symbol]) {
+        /*
+        * Put scores of prevData with PairData Weights
+        */
+
+        const pairDataMutable: PairData = this.pairData[pair.symbol]
+        const prevPairData: PairData = this.prevPairData[pair.symbol]
+
+        // get prevOptimalScore
+        return MachineLearningTrainer.getPrevOptimalScorePromise(pair.symbol, Binance)
+        .then(prevOptimalScore => {
+          prevPairData.o = prevOptimalScore
+
+          Analysis.intervalList.forEach(interval => {
+
+            let techAnalysisWeightsMutable = pairDataMutable.a[interval].a.tech.a
+            const techAnalysisScore = prevPairData.a[interval].a.tech.a
+
+            MachineLearningTrainer.setMovingAveragesWeights(
+              techAnalysisWeightsMutable.moveBack.a,
+              techAnalysisScore.moveBack.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+            MachineLearningTrainer.setPriceChangeWeights(
+              techAnalysisWeightsMutable,
+              techAnalysisScore,
+              prevOptimalScore
+            )
+
+            MachineLearningTrainer.setOscillatorWeights(
+              techAnalysisWeightsMutable.oscillators.a,
+              techAnalysisScore.oscillators.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+            MachineLearningTrainer.setCandleSticksWeights(
+              techAnalysisWeightsMutable.candlesticks.a,
+              techAnalysisScore.candlesticks.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+          })
+
+          MachineLearningTrainer.setIntervalWeightsAndPairScore(
+            pairDataMutable,
+            prevOptimalScore,
+            pairDataMutable.a
+          )
+
+        })
+      } else{
+        return Promise.resolve(this.pairData[pair.symbol])
+      }
+    })
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
 
@@ -156,7 +225,6 @@ class TradeBot implements ITradeBot {
     //     this.prevOptimalScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
     //   }
     // })))
-
 
 
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
@@ -272,7 +340,7 @@ class TradeBot implements ITradeBot {
     this.entity.prevOptimalScorePair = this.analysis.prevOptimalScore
     this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
-      acc[market] = this.analysis.marketScore[market].score
+      acc[market] = this.analysis.marketScore[market].battleScore
       return acc
     }, {})
 
