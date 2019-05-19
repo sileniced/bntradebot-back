@@ -49,8 +49,8 @@ class TradeBotEntity extends BaseEntity {
   @OneToOne(() => ScoresWeightsEntityV1, {
     cascade: true
   })
-  @JoinColumn()
-  public scoresWeightsV1: ScoresWeightsEntityV1
+  // @JoinColumn()
+  // public scoresWeightsV1: ScoresWeightsEntityV1
 
   @Column('timestamp with time zone')
   public tradeTime: Date

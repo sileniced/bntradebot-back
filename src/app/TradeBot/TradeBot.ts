@@ -5,15 +5,10 @@ import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../../services/Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
-import ScoresWeightsEntityV1, { PairData, ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
-import {
-  CandlestickIdxs,
-  MoveBackIdxs,
-  OscillatorIdxs
-} from '../Analysis/utils'
+import ScoresWeightsEntityV1, { PairData } from '../../entities/ScoresWeightsEntityV1'
 import BinanceApi from '../Binance'
 import PairWeightsEntityV1 from '../../entities/PairWeightsEntityV1'
-import MachineLearningTrainer from '../Analysis/MachineLearning/MachineLearningTrainer'
+import MLTrainer from '../Analysis/MachineLearning/MLTrainer'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -152,7 +147,7 @@ class TradeBot implements ITradeBot {
 
     await Promise.all(pairDataPromises)
 
-    const pairWeightsPromises: Promise<PairData>[] = this.pairsInfo.map(pair => {
+    const pairDataWeightsPromises: Promise<PairData>[] = this.pairsInfo.map(pair => {
       if (this.prevPairData[pair.symbol]) {
         /*
         * Put scores of prevData with PairData Weights
@@ -162,7 +157,7 @@ class TradeBot implements ITradeBot {
         const prevPairData: PairData = this.prevPairData[pair.symbol]
 
         // get prevOptimalScore
-        return MachineLearningTrainer.getPrevOptimalScorePromise(pair.symbol, Binance)
+        return MLTrainer.getPrevOptimalScorePromise(pair.symbol, Binance)
         .then(prevOptimalScore => {
           prevPairData.o = prevOptimalScore
 
@@ -171,27 +166,27 @@ class TradeBot implements ITradeBot {
             let techAnalysisWeightsMutable = pairDataMutable.a[interval].a.tech.a
             const techAnalysisScore = prevPairData.a[interval].a.tech.a
 
-            MachineLearningTrainer.setMovingAveragesWeights(
+            MLTrainer.setMovingAveragesWeights(
               techAnalysisWeightsMutable.moveBack.a,
               techAnalysisScore.moveBack.a,
               prevOptimalScore,
               techAnalysisWeightsMutable
             )
 
-            MachineLearningTrainer.setPriceChangeWeights(
+            MLTrainer.setPriceChangeWeights(
               techAnalysisWeightsMutable,
               techAnalysisScore,
               prevOptimalScore
             )
 
-            MachineLearningTrainer.setOscillatorWeights(
+            MLTrainer.setOscillatorWeights(
               techAnalysisWeightsMutable.oscillators.a,
               techAnalysisScore.oscillators.a,
               prevOptimalScore,
               techAnalysisWeightsMutable
             )
 
-            MachineLearningTrainer.setCandleSticksWeights(
+            MLTrainer.setCandleSticksWeights(
               techAnalysisWeightsMutable.candlesticks.a,
               techAnalysisScore.candlesticks.a,
               prevOptimalScore,
@@ -200,16 +195,25 @@ class TradeBot implements ITradeBot {
 
           })
 
-          MachineLearningTrainer.setIntervalWeightsAndPairScore(
+          MLTrainer.setIntervalWeightsAndPairScore(
             pairDataMutable,
             prevOptimalScore,
             pairDataMutable.a
           )
 
+          return pairDataMutable
+
         })
       } else{
         return Promise.resolve(this.pairData[pair.symbol])
       }
+    })
+
+    await Promise.all(pairDataWeightsPromises)
+    .then(pairDataWeights => {
+      this.pairsInfo.forEach((pair, idx) => {
+        this.pairData[pair.symbol] = pairDataWeights[idx]
+      })
     })
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
@@ -253,6 +257,7 @@ class TradeBot implements ITradeBot {
     //         market: {}
     //       })) as ScoresWeightsEntityV1Model
     // })
+
 
 
     const analysisPromise = this.analysis.run(logger, Binance)

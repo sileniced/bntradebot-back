@@ -117,6 +117,17 @@ export interface ScoresWeightsEntityV1Model {
   }
 }
 
+const test = (property: string, data: object, acc: number = 0): number => {
+  if (typeof data !== 'object') return acc;
+  if (property in data) {
+    const sum = Object.keys(data).reduce((sum, p) => property === p ? sum + data[property] : sum, acc);
+    return Object.keys(data).map(key => test(property, data[key], sum)).reduce((sum, n) => sum + n);
+
+  } else {
+    return Object.keys(data).map(key => test(property, data[key], acc)).reduce((sum, n) => sum + n);
+  }
+}
+
 @Entity()
 class ScoresWeightsEntityV1 extends BaseEntity {
 

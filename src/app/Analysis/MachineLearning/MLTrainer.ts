@@ -73,7 +73,7 @@ function shuffle(array): any[] {
   return array
 }
 
-class MachineLearningTrainer implements IMachineLearningTrainer {
+class MLTrainer implements IMachineLearningTrainer {
 
   private pairsTrained = 0
   private pairsCorrect = 0
@@ -116,7 +116,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
      *
      */
     const prevOptimalScorePromises: Promise<number>[] = participantPairs.map(pair => {
-      return MachineLearningTrainer.getPrevOptimalScorePromise(pair, this.Binance, history[pair])
+      return MLTrainer.getPrevOptimalScorePromise(pair, this.Binance, history[pair])
     })
 
     await Promise.all(prevOptimalScorePromises)
@@ -169,7 +169,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
       let pairData = this.activePairs[pair].weights
       const optimalScore = pairData.o
 
-      MachineLearningTrainer.setIntervalWeightsAndPairScore(
+      MLTrainer.setIntervalWeightsAndPairScore(
         pairData,
         optimalScore,
         this.activePairs[pair].weights.a
@@ -284,13 +284,20 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
   }
 
   private MovingAverages(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+    let moveBackData = MLTrainer.getMovingAveragesScores(candles, techAnalysis)
+    MLTrainer.setMovingAveragesWeights(moveBackData, moveBackData, optimalScore, techAnalysis)
+  }
+
+  static getMovingAveragesScores(
+    candles: StockData,
+    techAnalysis: TechAnalysis
+  ) {
     let moveBackData = MovingAveragesML(
       candles,
       techAnalysis.moveBack.a,
       techAnalysis.cross
     )
-
-    MachineLearningTrainer.setMovingAveragesWeights(moveBackData, moveBackData, optimalScore, techAnalysis)
+    return moveBackData
   }
 
   static setMovingAveragesWeights(
@@ -299,6 +306,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
     optimalScore: number,
     techAnalysis: TechAnalysis
   ) {
+
     // moveBack
     const emaMoveBackTotalWeights = EmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
@@ -344,12 +352,16 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
   }
 
   private Oscillators(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+    let oscillatorData = MLTrainer.getOscillatorScores(candles, techAnalysis)
+    MLTrainer.setOscillatorWeights(oscillatorData, oscillatorData, optimalScore, techAnalysis)
+  }
+
+  static getOscillatorScores(candles: StockData, techAnalysis: TechAnalysis) {
     let oscillatorData: OscillatorSW = OscillatorsML(
       candles,
       techAnalysis.oscillators.a
     )
-
-    MachineLearningTrainer.setOscillatorWeights(oscillatorData, oscillatorData, optimalScore, techAnalysis)
+    return oscillatorData
   }
 
   static setOscillatorWeights(
@@ -381,7 +393,7 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
 
   private PriceChange(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
     techAnalysis.priceChange.s = PriceChangeAnalysis(candles)
-    MachineLearningTrainer.setPriceChangeWeights(techAnalysis, techAnalysis, optimalScore)
+    MLTrainer.setPriceChangeWeights(techAnalysis, techAnalysis, optimalScore)
   }
 
   static setPriceChangeWeights(
@@ -397,12 +409,16 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
   }
 
   private CandleSticks(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+    let candleStickData = MLTrainer.getCandleStickScore(candles, techAnalysis)
+    MLTrainer.setCandleSticksWeights(candleStickData, candleStickData, optimalScore, techAnalysis)
+  }
+
+  static getCandleStickScore(candles: StockData, techAnalysis: TechAnalysis) {
     let candleStickData: CandleStickData = CandleStickAnalysisML(
       candles,
       techAnalysis.candlesticks.a
     )
-
-    MachineLearningTrainer.setCandleSticksWeights(candleStickData, candleStickData, optimalScore, techAnalysis)
+    return candleStickData
   }
 
   static setCandleSticksWeights(
@@ -524,4 +540,4 @@ class MachineLearningTrainer implements IMachineLearningTrainer {
 
 }
 
-export default MachineLearningTrainer
+export default MLTrainer

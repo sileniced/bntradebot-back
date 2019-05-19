@@ -1,10 +1,10 @@
 import setupDb from './db'
 import BinanceApi from './app/Binance'
-import MachineLearningTrainer from './app/Analysis/MachineLearning/MachineLearningTrainer'
+import MLTrainer from './app/Analysis/MachineLearning/MLTrainer'
 
 export const BinanceML = new BinanceApi()
 
-const trainer = new MachineLearningTrainer(BinanceML)
+const trainer = new MLTrainer(BinanceML)
 
 setupDb().then(() => {
   BinanceML.getTime().then(time => {
