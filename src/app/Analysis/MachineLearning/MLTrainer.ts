@@ -25,9 +25,9 @@ import {
   OscillatorNames,
   SmaMoveBackNames
 } from '../utils'
-import { calcScore, CandleStickAnalysisML, CandleStickLevels, sigmoid } from '../CandleStickAnalysis'
-import { MovingAveragesML } from '../MovingAverages'
-import { OscillatorsML } from '../Oscillators'
+import { calcScore, CandleStickAnalysis, CandleStickLevels, sigmoid } from '../CandleStickAnalysis'
+import { MovingAverages } from '../MovingAverages'
+import { Oscillators } from '../Oscillators'
 import PriceChangeAnalysis from '../PriceChangeAnalysis'
 import { initWeights } from './utils'
 
@@ -302,7 +302,7 @@ class MLTrainer implements IMachineLearningTrainer {
     candles: StockData,
     techAnalysis: TechAnalysis
   ) {
-    return MovingAveragesML(
+    return MovingAverages(
       candles,
       techAnalysis.moveBack.a,
       techAnalysis.cross
@@ -380,7 +380,7 @@ class MLTrainer implements IMachineLearningTrainer {
   }
 
   static getOscillatorScores(candles: StockData, techAnalysis: TechAnalysis) {
-    return OscillatorsML(
+    return Oscillators(
       candles,
       techAnalysis.oscillators.a
     )
@@ -442,7 +442,7 @@ class MLTrainer implements IMachineLearningTrainer {
   }
 
   static getCandleStickScore(candles: StockData, techAnalysis: TechAnalysis) {
-    return CandleStickAnalysisML(
+    return CandleStickAnalysis(
       candles,
       techAnalysis.candlesticks.a
     )

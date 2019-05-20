@@ -54,7 +54,7 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: 1000 * 60 * 10 /*10000*/
+    globalTradeInterval: /*600000*/ 10000
   }
 
   private prevPairData: { [pair: string]: PairData } = {}

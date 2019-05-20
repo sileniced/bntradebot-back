@@ -75,10 +75,6 @@ class TradeBot implements ITradeBot {
   private droppedPairs: DroppedPair[] = []
   private dollarDiff: number
 
-  // private readonly prevTradeBot: TradeBot | undefined
-  // private prevOptimalScore: { [pair: string]: number | null } = {}
-  // private readonly getScoresWeightPromise: () => Promise<ScoresWeightsEntityV1Model | null> | null
-
   private prevPairData: { [pair: string]: PairData } = {}
   private pairData: { [pair: string]: PairData } = {}
 
@@ -92,16 +88,6 @@ class TradeBot implements ITradeBot {
     this.balancePostTrade = this.getNormalizedSymbols()
 
     this.prevPairData = prevPairData
-
-    // this.prevTradeBot = prevTradeBot
-    // this.getScoresWeightPromise = () => this.prevTradeBot ? null : TradeBotEntity.find({
-    //   take: 1,
-    //   where: { user: this.user.id },
-    //   order: { tradeTime: 'DESC' },
-    //   relations: ['scoresWeightsV1']
-    // }).then((tradeBot: TradeBotEntity[]) => {
-    //       return tradeBot[0] ? tradeBot[0].scoresWeightsV1.scoresWeights : null
-    //     })
 
   }
 
@@ -217,46 +203,10 @@ class TradeBot implements ITradeBot {
     })
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
-
-    // let scoresWeight
-    // const scoresWeightPromise = !this.prevTradeBot ? this.getScoresWeightPromise() : null
-    //
-    // await Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
-    //   this.prices[pair.symbol] = price
-    //   if (this.prevTradeBot) {
-    //     this.prevOptimalScore[pair.symbol] = Analysis.getPriceChangeScore(this.prevTradeBot.prices[pair.symbol], price)
-    //   } else {
-    //     this.prevOptimalScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
-    //   }
-    // })))
-
-
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
 
     const pricesBtcNames: string[] = this.user.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
-
-    // if (!this.prevTradeBot) scoresWeight = await scoresWeightPromise
-    //
-    // this.analysis = new Analysis({
-    //   pairsInfo: this.pairsInfo,
-    //   getNormalizedSymbols: this.getNormalizedSymbols,
-    //   prevOptimalScore: this.prevOptimalScore,
-    //   prevData: (this.prevTradeBot
-    //     ? this.prevTradeBot.analysis.dataCollector
-    //     : (scoresWeight
-    //       ? scoresWeight
-    //       : {
-    //         symbols: {},
-    //         pairs: {},
-    //         names: {
-    //           moveBack: MoveBackIdxs,
-    //           candlesticks: CandlestickIdxs,
-    //           oscillators: OscillatorIdxs
-    //         },
-    //         market: {}
-    //       })) as ScoresWeightsEntityV1Model
-    // })
 
     this.analysis = new Analysis({
       getNormalizedSymbols: this.getNormalizedSymbols,
@@ -339,10 +289,6 @@ class TradeBot implements ITradeBot {
     /**
      * START HANDLING ANALYSIS
      */
-
-    // this.entity.scoresWeightsV1 = await ScoresWeightsEntityV1.create({
-    //   scoresWeights: this.analysis.dataCollector
-    // }).save()
 
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore
@@ -475,7 +421,6 @@ class TradeBot implements ITradeBot {
     this.entity.balancePostTradeSymbols = this.balancePostTrade
 
     this.dollarDiff = (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT'])
-
 
     this.entity.pricesPairs = this.prices
 
