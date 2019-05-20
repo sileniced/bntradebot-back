@@ -210,6 +210,10 @@ class TradeBot implements ITradeBot {
       })
     })
 
+    const pricesPromises = Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
+      this.prices[pair.symbol] = price
+    })))
+
     const balancePromise = Binance.getAccountBalances(this.user.id)
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
 
@@ -432,6 +436,8 @@ class TradeBot implements ITradeBot {
     this.entity.balancePostTradeSymbols = this.balancePostTrade
 
     this.dollarDiff = (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT'])
+
+    await pricesPromises
 
     this.entity.pricesPairs = this.prices
 
