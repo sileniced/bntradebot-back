@@ -15,7 +15,7 @@ import BinanceApi from '../../Binance'
 import StockData from 'technicalindicators/declarations/StockData'
 import Analysis from '../index'
 import PairWeightsEntityV1 from '../../../entities/PairWeightsEntityV1'
-import { calcWeight } from '../mlWeightUtils'
+import { calcWeight } from './mlWeightUtils'
 import {
   CandlestickIdxs,
   CandlestickNames,
@@ -214,7 +214,15 @@ class MLTrainer implements IMachineLearningTrainer {
     })
 
     await Promise.all(updatePairsPromises)
+  }
 
+  static sumIntervalScoresAndSumPairScore = (pairData: { [interval: string]: IntervalDataSWA }) => {
+    return Analysis.intervalList.reduce((acc, interval) => {
+      let techAnalysis: TechAnalysis = pairData[interval].a.tech.a
+      return acc + MLTrainer.techNames.reduce((acc, name) => {
+        return acc + (techAnalysis[name].s * techAnalysis[name].w)
+      }, 0)
+    }, 0)
   }
 
   static setIntervalWeightsAndPairScore(
@@ -226,13 +234,11 @@ class MLTrainer implements IMachineLearningTrainer {
       let intervalAnalysis: IntervalDataSWA = intervalData[interval]
       let techAnalysis: TechAnalysis = intervalAnalysis.a.tech.a
 
-      const techNames = ['oscillators', 'candlesticks', 'moveBack', 'cross', 'priceChange']
-
-      const techTotalWeights = techNames.reduce((acc, name) => {
+      const techTotalWeights = this.techNames.reduce((acc, name) => {
         return acc + techAnalysis[name].w
       }, 0)
 
-      intervalAnalysis.s = techNames.reduce((acc, name) => {
+      intervalAnalysis.s = this.techNames.reduce((acc, name) => {
         techAnalysis[name].w /= techTotalWeights
         return acc + (techAnalysis[name].s * techAnalysis[name].w)
       }, 0)
@@ -252,6 +258,8 @@ class MLTrainer implements IMachineLearningTrainer {
       return acc + (intervalAnalysis.s * intervalAnalysis.w)
     }, 0)
   }
+
+  private static techNames = ['oscillators', 'candlesticks', 'moveBack', 'cross', 'priceChange']
 
   static getPrevOptimalScorePromise(pair, Binance: BinanceApi, history?: number) {
     let optimalScore = 0.5
@@ -379,7 +387,7 @@ class MLTrainer implements IMachineLearningTrainer {
   }
 
   static sumOscillatorsScore = oscillatorData => OscillatorNames.reduce((acc, name) => {
-    const {s: score, w: weight} = oscillatorData[OscillatorIdxs[name]]
+    const { s: score, w: weight } = oscillatorData[OscillatorIdxs[name]]
     return acc + (score * weight)
   }, 0)
 
@@ -440,10 +448,35 @@ class MLTrainer implements IMachineLearningTrainer {
     )
   }
 
-  static sumCandleStickScores = candleStickData => CandleStickLevels.reduce((acc, [level]) => {
-    const levelData = candleStickData[level]
-    return acc + (levelData.s * levelData.w)
-  }, 0)
+  static sumCandleStickScores = candleStickData => {
+    return CandleStickLevels.reduce((acc, [level]) => {
+      const levelData = candleStickData[level]
+
+      const bullishScore = CandlestickNames.bullish.reduce((acc, name) => {
+        const { s: score, w: weight } = levelData.a.bullish[CandlestickIdxs.bullish[name]]
+        acc.score += score ? weight * sigmoid(acc.count, CandlestickNames.bullish.length) : 0
+        acc.count += score
+        return acc
+      }, {
+        score: 0,
+        count: 0
+      }).score
+
+      const bearishScore = CandlestickNames.bearish.reduce((acc, name) => {
+        const { s: score, w: weight } = levelData.a.bearish[CandlestickIdxs.bearish[name]]
+        acc.score += score ? weight * sigmoid(acc.count, CandlestickNames.bearish.length) : 0
+        acc.count += score
+        return acc
+      }, {
+        score: 0,
+        count: 0
+      }).score
+
+      levelData.s = calcScore(bullishScore, bearishScore)
+
+      return acc + (levelData.s * levelData.w)
+    }, 0)
+  }
 
   static setCandleSticksWeights(
     candleStickDataWeights: CandleStickData,

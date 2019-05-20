@@ -5,7 +5,7 @@ import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../../services/Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
-import ScoresWeightsEntityV1, { PairData } from '../../entities/ScoresWeightsEntityV1'
+import { PairData } from '../../entities/ScoresWeightsEntityV1'
 import BinanceApi from '../Binance'
 import PairWeightsEntityV1 from '../../entities/PairWeightsEntityV1'
 import MLTrainer from '../Analysis/MachineLearning/MLTrainer'
@@ -153,7 +153,7 @@ class TradeBot implements ITradeBot {
         * Put scores of prevData with PairData Weights
         */
 
-        const pairDataMutable: PairData = this.pairData[pair.symbol]
+        let pairDataMutable: PairData = this.pairData[pair.symbol]
         const prevPairData: PairData = this.prevPairData[pair.symbol]
 
         // get prevOptimalScore
@@ -336,13 +336,16 @@ class TradeBot implements ITradeBot {
      * START HANDLING ANALYSIS
      */
 
-    this.entity.scoresWeightsV1 = await ScoresWeightsEntityV1.create({
-      scoresWeights: this.analysis.dataCollector
-    }).save()
+    // this.entity.scoresWeightsV1 = await ScoresWeightsEntityV1.create({
+    //   scoresWeights: this.analysis.dataCollector
+    // }).save()
 
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore
-    this.entity.prevOptimalScorePair = this.analysis.prevOptimalScore
+    this.entity.prevOptimalScorePair = this.pairsInfo.reduce((acc, pair) => {
+      acc[pair.symbol] = this.pairData[pair.symbol].o
+      return acc
+    }, {})
     this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
       acc[market] = this.analysis.marketScore[market].battleScore
@@ -490,6 +493,11 @@ class TradeBot implements ITradeBot {
       return order.save()
     }))
     .catch(console.error)
+
+    return {
+      pairData: this.pairData,
+      pairs: this.pairsInfo
+    }
 
   }
 

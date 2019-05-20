@@ -1,5 +1,5 @@
 import Analysis from '../index'
-import { addEVENWeight, addNAIVEWeight } from '../mlWeightUtils'
+import { addEVENWeight, addNAIVEWeight } from './mlWeightUtils'
 import {
   CandlestickIdxs,
   EmaMoveBackNames,

@@ -2,7 +2,7 @@ import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
 import { CandleStickData, CandleStickBullBear } from '../../entities/ScoresWeightsEntityV1'
 import { CandlestickIdxs, CandlestickNames } from './utils'
-import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from './mlWeightUtils'
+import { addEVENWeight, addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from './MachineLearning/mlWeightUtils'
 
 export const settings = {
   depth: 10

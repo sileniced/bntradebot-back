@@ -4,7 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsEntityV1'
 import { addScores, MoveBackIdxs, MoveBackNames } from '../utils'
-import { addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from '../mlWeightUtils'
+import { addMachineLearningWeights, addNAIVEWeight, MachineLearningData } from '../MachineLearning/mlWeightUtils'
 
 export const MovingAveragesML = (
   stockData: StockData,

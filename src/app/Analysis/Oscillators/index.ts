@@ -4,7 +4,7 @@ import Values from './Values'
 import Scoring from './Scoring'
 import { OscillatorSW } from '../../../entities/ScoresWeightsEntityV1'
 import { addScores, OscillatorIdxs, OscillatorNames } from '../utils'
-import { addEVENWeight, addMachineLearningWeights, MachineLearningData } from '../mlWeightUtils'
+import { addEVENWeight, addMachineLearningWeights, MachineLearningData } from '../MachineLearning/mlWeightUtils'
 
 export const OscillatorsML = (
   stockData: StockData,

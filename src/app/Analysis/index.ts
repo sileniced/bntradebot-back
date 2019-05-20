@@ -1,14 +1,10 @@
 import { CandleChartInterval, OrderSide, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
-import Oscillators from './Oscillators'
-import MovingAverages from './MovingAverages'
-import CandleStickAnalysis from './CandleStickAnalysis'
 import AnalysisNews from './NewsAnalysis'
 import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
 import { PairData } from '../../entities/ScoresWeightsEntityV1'
-import { addMachineLearningWeights, MachineLearningData } from './mlWeightUtils'
 import { SMA } from 'technicalindicators'
 import BinanceApi from '../Binance'
 import MLTrainer from './MachineLearning/MLTrainer'
@@ -83,7 +79,7 @@ class Analysis implements IAnalysis {
   static readonly intervalList: CandleChartInterval[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
   static readonly initIntervalWeights: number[] = [0.008, 0.016, 0.032, 0.032, 0.064, 0.128, 0.096, 0.048, 0.096, 0.144, 0.192, 0.144]
-  private intervalWeights: { [pair: string]: number[] } = {}
+  // private intervalWeights: { [pair: string]: number[] } = {}
   static readonly initTechAnalysisWeights = {
     candlesticks: 0.109,
     oscillators: 0.219,
@@ -355,10 +351,13 @@ class Analysis implements IAnalysis {
 
     this.pairsInfo.forEach(pair => {
       Analysis.intervalList.forEach(interval => {
-        const techAnalysis = this.pairData[pair.symbol].a[interval].a.tech.a
+        const pairData: PairData = this.pairData[pair.symbol]
+        const techAnalysis = pairData.a[interval].a.tech.a
         techAnalysis.moveBack.s = MLTrainer.sumMovingAveragesScore(techAnalysis.moveBack.a)
         techAnalysis.oscillators.s = MLTrainer.sumOscillatorsScore(techAnalysis.oscillators.a)
+        techAnalysis.candlesticks.s = MLTrainer.sumCandleStickScores(techAnalysis.candlesticks.a)
 
+        this.techPairScore[pair.symbol] = MLTrainer.sumIntervalScoresAndSumPairScore(pairData.a)
       })
     })
 

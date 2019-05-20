@@ -73,9 +73,9 @@ class BinanceApi {
       // })
 
       new TradeBot(this.activeTradeBotUsers[id], this.prevPairData).run(this)
-      .then(({ prevPairData, prevPairs }) => {
-        prevPairs.forEach(pair => {
-          this.prevPairData[pair] = prevPairData[pair]
+      .then(({ pairData, pairs }) => {
+        pairs.forEach(pair => {
+          this.prevPairData[pair.symbol] = pairData[pair.symbol]
         })
       })
 
