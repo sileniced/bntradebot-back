@@ -1,7 +1,7 @@
 import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
 export interface MoveBackSW {
-  [maLengthNumber: number]: {
+  [maLengthIdx: number]: {
     w: number
     s: number
   }
@@ -13,68 +13,80 @@ export interface CrossSW {
 }
 
 export interface OscillatorSW {
-  [oscilatorNumber: number]: {
+  [oscilatorIdx: number]: {
     w: number
     s: number
   }
 }
 
-export interface CandleStickSW {
+export interface CandleStickBullBear {
   bullish: {
-    [bullishNumber: number]: {
+    [bullishIdx: number]: {
       w: number
       s: number
     }
   }
   bearish: {
-    [bearishNumber: number]: {
+    [bearishIdx: number]: {
       w: number
       s: number
     }
   }
 }
 
+export interface CandleStickLevelSW {
+  w: number
+  s: number
+  a: CandleStickBullBear
+}
+
 export interface CandleStickData {
-  [depthLevelNumber: number]: {
+  [depthLevelIdx: number]: CandleStickLevelSW
+}
+
+export interface TechAnalysis {
+  oscillators: {
     w: number
     s: number
-    a: CandleStickSW
+    a: OscillatorSW
+  }
+  candlesticks: {
+    w: number
+    s: number
+    a: CandleStickData
+  }
+  moveBack: {
+    w: number
+    s: number
+    a: MoveBackSW
+  }
+  cross: CrossSW
+  priceChange: {
+    w: number
+    s: number
+  }
+}
+
+export interface IntervalDataSWA {
+  w: number
+  s: number
+  a: {
+    tech: {
+      w: number
+      s: number
+      a: TechAnalysis
+    }
   }
 }
 
 export interface IntervalData {
-  [interval: string]: {
-    w: number
-    s: number
-    a: {
-      tech: {
-        w: number
-        s: number
-        a: {
-          oscillators: {
-            w: number
-            s: number
-            a: OscillatorSW
-          }
-          candlesticks: {
-            w: number
-            s: number
-            a: CandleStickData
-          }
-          moveBack: {
-            w: number
-            s: number
-            a: MoveBackSW
-          }
-          cross: CrossSW
-          priceChange: {
-            w: number
-            s: number
-          }
-        }
-      }
-    }
-  }
+  [interval: string]: IntervalDataSWA
+}
+
+export interface PairData {
+  o: number,
+  s: number
+  a: IntervalData
 }
 
 export interface ScoresWeightsEntityV1Model {
@@ -87,11 +99,7 @@ export interface ScoresWeightsEntityV1Model {
     moveBack: { [moveBackName: string]: number }
   },
   pairs: {
-    [pair: string]: {
-      o: number,
-      s: number
-      a: IntervalData
-    }
+    [pair: string]: PairData
   }
   symbols: {
     [symbol: string]: {
@@ -106,6 +114,17 @@ export interface ScoresWeightsEntityV1Model {
       w: number
       s: number
     }
+  }
+}
+
+const test = (property: string, data: object, acc: number = 0): number => {
+  if (typeof data !== 'object') return acc;
+  if (property in data) {
+    const sum = Object.keys(data).reduce((sum, p) => property === p ? sum + data[property] : sum, acc);
+    return Object.keys(data).map(key => test(property, data[key], sum)).reduce((sum, n) => sum + n);
+
+  } else {
+    return Object.keys(data).map(key => test(property, data[key], acc)).reduce((sum, n) => sum + n);
   }
 }
 

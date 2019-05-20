@@ -5,6 +5,7 @@ import User from './entities/User'
 import SavedOrder from './entities/SavedOrder'
 import TradeBotEntity from './entities/TradeBotEntity'
 import ScoresWeightsEntityV1 from './entities/ScoresWeightsEntityV1'
+import PairWeightsEntityV1 from './entities/PairWeightsEntityV1'
 
 const db = () =>
   createConnection({
@@ -12,7 +13,8 @@ const db = () =>
       User,
       SavedOrder,
       TradeBotEntity,
-      ScoresWeightsEntityV1
+      ScoresWeightsEntityV1,
+      PairWeightsEntityV1,
     ],
     logging: false,
     namingStrategy: new CustomNamingStrategy(),

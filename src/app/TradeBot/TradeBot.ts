@@ -1,17 +1,14 @@
 import User from '../../entities/User'
-import { Binance } from '../../index'
 import { OrderSide, Symbol } from 'binance-api-node'
 import NegotiationTable, { ParticipantPair } from './NegotiationTable'
 import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../../services/Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
-import ScoresWeightsEntityV1, { ScoresWeightsEntityV1Model } from '../../entities/ScoresWeightsEntityV1'
-import {
-  dataCollectorCandlestickNames,
-  dataCollectorMoveBackNames,
-  dataCollectorOscillatorNames
-} from '../Analysis/utils'
+import { PairData } from '../../entities/ScoresWeightsEntityV1'
+import BinanceApi from '../Binance'
+import PairWeightsEntityV1 from '../../entities/PairWeightsEntityV1'
+import MLTrainer from '../Analysis/MachineLearning/MLTrainer'
 
 export interface Trade extends ParticipantPair {
   score: number,
@@ -61,8 +58,6 @@ class TradeBot implements ITradeBot {
   protected readonly user: User
   private entity: TradeBotEntity
 
-  // todo: get from user database ('USDT' required)
-  readonly symbols = ['USDT', 'BTC', 'ETH', 'BNB', 'EOS', 'NEO', 'IOTA', 'LTC', 'BCHABC']
   protected pairsInfo: Symbol[] = []
 
   private balance: { [pair: string]: number } = {}
@@ -80,98 +75,146 @@ class TradeBot implements ITradeBot {
   private droppedPairs: DroppedPair[] = []
   private dollarDiff: number
 
-  private readonly prevTradeBot: TradeBot | undefined
-  private prevOptimalPriceChangeScore: { [pair: string]: number | null } = {}
-  private readonly getScoresWeightPromise: () => Promise<ScoresWeightsEntityV1Model | null> | null
+  private prevPairData: { [pair: string]: PairData } = {}
+  private pairData: { [pair: string]: PairData } = {}
 
-  constructor(user: User, prevTradeBot: TradeBot | undefined) {
+  constructor(user: User, prevPairData: { [pair: string]: PairData }) {
     this.user = user
     this.entity = new TradeBotEntity()
     this.entity.user = user
-    this.entity.symbols = this.symbols
+    this.entity.symbols = this.user.symbols
 
     this.balance = this.getNormalizedSymbols()
     this.balancePostTrade = this.getNormalizedSymbols()
 
-    this.prevTradeBot = prevTradeBot
-    this.getScoresWeightPromise = () => this.prevTradeBot ? null : TradeBotEntity.find({
-      take: 1,
-      where: { user: this.user.id },
-      order: { tradeTime: 'DESC' },
-      relations: ['scoresWeightsV1']
-    }).then((tradeBot: TradeBotEntity[]) => {
-      return tradeBot[0] ? tradeBot[0].scoresWeightsV1.scoresWeights : null
-    })
+    this.prevPairData = prevPairData
 
   }
 
   protected readonly getNormalizedSymbols = (): { [symbol: string]: number } => {
     const obj = {}
-    for (let i = 0, len = this.symbols.length; i < len; i++) obj[this.symbols[i]] = 0
+    for (let i = 0, len = this.user.symbols.length; i < len; i++) obj[this.user.symbols[i]] = 0
     return obj
   }
 
-  public async run() {
+  public async run(Binance: BinanceApi) {
+    const start = Date.now()
+    const logger = new Logger()
+
     const balanceBtc = this.getNormalizedSymbols()
     const dollarBalance: { [symbol: string]: number } = this.getNormalizedSymbols()
     const differenceBtc = this.getNormalizedSymbols()
     const difference = this.getNormalizedSymbols()
 
+    let pairDataPromises: Promise<void>[] = []
+
     await Binance.getPairs().then(pairInfo => {
-      this.pairsInfo = pairInfo.filter(pair => this.symbols.includes(pair.baseAsset) && this.symbols.includes(pair.quoteAsset))
-      this.entity.pairs = this.pairsInfo.map(pair => pair.symbol)
+      this.pairsInfo = pairInfo.filter(pair => this.user.symbols.includes(pair.baseAsset) && this.user.symbols.includes(pair.quoteAsset))
+
+      this.pairsInfo.forEach(pair => {
+        this.entity.pairs.push(pair.symbol)
+        pairDataPromises.push(PairWeightsEntityV1.find({ where: { pairName: pair.symbol } })
+        .then((pairData: PairWeightsEntityV1[]) => {
+          this.pairData[pair.symbol] = {
+            a: pairData[0].weights,
+            s: 0.5,
+            o: 0.5
+          }
+        }))
+      })
+
+      /* overwriting to remove irrelevant pairs */
+      this.prevPairData = this.pairsInfo.reduce((acc, pair) => {
+        acc[pair.symbol] = this.prevPairData[pair.symbol]
+        return acc
+      }, {})
+
     })
-    const start = Date.now()
-    const logger = new Logger()
+
+    await Promise.all(pairDataPromises)
+
+    const pairDataWeightsPromises: Promise<PairData>[] = this.pairsInfo.map(pair => {
+      if (this.prevPairData[pair.symbol]) {
+        /*
+        * Put scores of prevData with PairData Weights
+        */
+
+        let pairDataMutable: PairData = this.pairData[pair.symbol]
+        const prevPairData: PairData = this.prevPairData[pair.symbol]
+
+        // get prevOptimalScore
+        return MLTrainer.getPrevOptimalScorePromise(pair.symbol, Binance)
+        .then(prevOptimalScore => {
+          prevPairData.o = prevOptimalScore
+
+          Analysis.intervalList.forEach(interval => {
+
+            let techAnalysisWeightsMutable = pairDataMutable.a[interval].a.tech.a
+            const techAnalysisScore = prevPairData.a[interval].a.tech.a
+
+            MLTrainer.setMovingAveragesWeights(
+              techAnalysisWeightsMutable.moveBack.a,
+              techAnalysisScore.moveBack.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+            MLTrainer.setPriceChangeWeights(
+              techAnalysisWeightsMutable,
+              techAnalysisScore,
+              prevOptimalScore
+            )
+
+            MLTrainer.setOscillatorWeights(
+              techAnalysisWeightsMutable.oscillators.a,
+              techAnalysisScore.oscillators.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+            MLTrainer.setCandleSticksWeights(
+              techAnalysisWeightsMutable.candlesticks.a,
+              techAnalysisScore.candlesticks.a,
+              prevOptimalScore,
+              techAnalysisWeightsMutable
+            )
+
+          })
+
+          MLTrainer.setIntervalWeightsAndPairScore(
+            pairDataMutable,
+            prevOptimalScore,
+            pairDataMutable.a
+          )
+
+          return pairDataMutable
+
+        })
+      } else{
+        return Promise.resolve(this.pairData[pair.symbol])
+      }
+    })
+
+    await Promise.all(pairDataWeightsPromises)
+    .then(pairDataWeights => {
+      this.pairsInfo.forEach((pair, idx) => {
+        this.pairData[pair.symbol] = pairDataWeights[idx]
+      })
+    })
 
     const balancePromise = Binance.getAccountBalances(this.user.id)
-
-    let scoresWeight
-    const scoresWeightPromise = !this.prevTradeBot ? await this.getScoresWeightPromise() : null
-
-    await Promise.all(this.pairsInfo.map(pair => Binance.getAvgPrice(pair.symbol).then(price => {
-      this.prices[pair.symbol] = price
-      if (this.prevTradeBot) {
-        const change = (price - this.prevTradeBot.prices[pair.symbol]) / this.prevTradeBot.prices[pair.symbol]
-        if (change > 0) {
-          const quote = Math.sqrt(change)
-          this.prevOptimalPriceChangeScore[pair.symbol] = quote > 0.5 ? 1 : 0.5 + quote
-        } else {
-          const quote = Math.sqrt(-change)
-          this.prevOptimalPriceChangeScore[pair.symbol] = quote > 0.5 ? 0 : 0.5 - quote
-        }
-      } else {
-        this.prevOptimalPriceChangeScore[pair.symbol] = scoresWeightPromise ? 0.5 : null
-      }
-    })))
-
     const btcUsdtPricePromise = Binance.getAvgPrice('BTCUSDT')
 
-    const pricesBtcNames: string[] = this.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
+    const pricesBtcNames: string[] = this.user.symbols.filter(symbol => !['BTC', 'USDT'].includes(symbol)).map(symbol => `${symbol}BTC`)
     const prisesBtcPromise = Promise.all(pricesBtcNames.map(pair => Binance.getAvgPrice(pair)))
 
-    if (!this.prevTradeBot) scoresWeight = await scoresWeightPromise
-
     this.analysis = new Analysis({
-      pairsInfo: this.pairsInfo,
       getNormalizedSymbols: this.getNormalizedSymbols,
-      prevOptimalScore: this.prevOptimalPriceChangeScore,
-      prevData: (this.prevTradeBot
-        ? this.prevTradeBot.analysis.dataCollector
-        : (scoresWeight
-          ? scoresWeight
-          : {
-            symbols: {},
-            pairs: {},
-            names: {
-              moveBack: dataCollectorMoveBackNames,
-              candlesticks: dataCollectorCandlestickNames,
-              oscillators: dataCollectorOscillatorNames
-            },
-            market: {}
-          })) as ScoresWeightsEntityV1Model
+      pairsInfo: this.pairsInfo,
+      pairData: this.pairData
     })
-    const analysisPromise = this.analysis.run(logger)
+
+    const analysisPromise = this.analysis.run(logger, Binance)
 
     await Promise.all([btcUsdtPricePromise, prisesBtcPromise, balancePromise])
     .then(([btcUsdtPrice, pricesBtc, balances]) => {
@@ -184,7 +227,7 @@ class TradeBot implements ITradeBot {
       for (let i = 0, len = balances.length; i < len; i++) {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
-        if (amount > 0 && this.symbols.includes(balance.asset)) {
+        if (amount > 0 && this.user.symbols.includes(balance.asset)) {
           this.balance[balance.asset] += amount
           balanceBtc[balance.asset] += amount * this.prices[`${balance.asset}BTC`]
           dollarBalance[balance.asset] += balanceBtc[balance.asset] * this.prices['BTCUSDT']
@@ -247,21 +290,20 @@ class TradeBot implements ITradeBot {
      * START HANDLING ANALYSIS
      */
 
-    this.entity.scoresWeightsV1 = await ScoresWeightsEntityV1.create({
-      scoresWeights: this.analysis.dataCollector
-    }).save()
-
     this.entity.symbolPie = this.analysis.symbolPie
     this.entity.analysisTechPairs = this.analysis.techPairScore
-    this.entity.prevOptimalScorePair = this.analysis.prevOptimalScore
+    this.entity.prevOptimalScorePair = this.pairsInfo.reduce((acc, pair) => {
+      acc[pair.symbol] = this.pairData[pair.symbol].o
+      return acc
+    }, {})
     this.entity.markets = this.analysis.marketSymbols
     this.entity.analysisMarket = this.analysis.marketSymbols.reduce((acc, market) => {
       acc[market] = this.analysis.marketScore[market].battleScore
       return acc
     }, {})
 
-    for (let i = 0, len = this.symbols.length; i < len; i++) {
-      const symbol = this.symbols[i]
+    for (let i = 0, len = this.user.symbols.length; i < len; i++) {
+      const symbol = this.user.symbols[i]
       symPieBtc[symbol] += this.analysis.symbolPie[symbol] * this.balanceTotalBtc
       balancePerc[symbol] += (balanceBtc[symbol] / this.balanceTotalBtc)
       diffPerc[symbol] += balancePerc[symbol] - this.analysis.symbolPie[symbol]
@@ -367,7 +409,7 @@ class TradeBot implements ITradeBot {
       for (let i = 0, len = balances.length; i < len; i++) {
         const balance = balances[i]
         const amount = parseFloat(balance.free)
-        if (amount > 0 && this.symbols.includes(balance.asset)) {
+        if (amount > 0 && this.user.symbols.includes(balance.asset)) {
           const amountBtc = amount * this.prices[`${balance.asset}BTC`]
           newTotalBtc += amountBtc
           newDollarBalance[balance.asset] += amountBtc * this.prices['BTCUSDT']
@@ -379,7 +421,6 @@ class TradeBot implements ITradeBot {
     this.entity.balancePostTradeSymbols = this.balancePostTrade
 
     this.dollarDiff = (newTotalBtc * this.prices['BTCUSDT']) - (this.balanceTotalBtc * this.prices['BTCUSDT'])
-
 
     this.entity.pricesPairs = this.prices
 
@@ -401,6 +442,11 @@ class TradeBot implements ITradeBot {
       return order.save()
     }))
     .catch(console.error)
+
+    return {
+      pairData: this.pairData,
+      pairs: this.pairsInfo
+    }
 
   }
 

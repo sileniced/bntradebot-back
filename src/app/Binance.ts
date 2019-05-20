@@ -2,7 +2,7 @@ import binance, {
   AssetBalance,
   AvgPriceResult,
   Binance, CandleChartInterval,
-  CandleChartResult,
+  CandleChartResult, CandlesOptions,
   ExchangeInfo,
   NewOrder,
   OrderBook,
@@ -18,6 +18,7 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
+import { PairData } from '../entities/ScoresWeightsEntityV1'
 // import TradeBotEntity from '../entities/TradeBotEntity'
 // import { Raw } from 'typeorm'
 
@@ -53,24 +54,33 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: 1000 * 60 * 10 /*10000*/
+    globalTradeInterval: /*600000*/ 10000
   }
 
-  private prevTradeBot: { [userId: number]: TradeBot } = {}
+  private prevPairData: { [pair: string]: PairData } = {}
+  // private prevTradeBot: { [userId: number]: TradeBot } = {}
   private activeTradeBotUserIds: number[] = []
   private activeTradeBotUsers: { [userId: number]: User } = {}
   private tradeBotExecute = (): void => {
 
     this.activeTradeBotUserIds.forEach(id => {
 
-      this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      this.prevTradeBot[id].run()
-      .catch((e) => {
-        console.error(e)
-        throw e
-      })
-    })
+      // this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
+      // this.prevTradeBot[id].run(this)
+      // .catch((e) => {
+      //   console.error(e)
+      //   throw e
+      // })
 
+      new TradeBot(this.activeTradeBotUsers[id], this.prevPairData).run(this)
+      .then(({ pairData, pairs }) => {
+        pairs.forEach(pair => {
+          this.prevPairData[pair.symbol] = pairData[pair.symbol]
+        })
+      })
+
+
+    })
 
 
     // TradeBotEntity.find({
@@ -129,16 +139,25 @@ class BinanceApi {
     return error
   })
 
-  public getCandlesStockData = (symbol, interval: CandleChartInterval, limit = 200): Promise<StockData> => this.api.candles({
-    symbol,
-    interval,
-    limit
-  })
-  .then(candles => CreateTechAnalysisData(candles))
-  .catch(error => {
-    console.error(error)
-    return error
-  })
+  public getCandlesStockData = (
+    symbol: string,
+    interval: CandleChartInterval,
+    limit: number = 200,
+    endTime?: number
+  ): Promise<StockData> => {
+    const options: CandlesOptions = {
+      symbol,
+      interval,
+      limit
+    }
+    if (endTime) options.endTime = endTime
+    return this.api.candles(options)
+    .then(candles => CreateTechAnalysisData(candles))
+    .catch(error => {
+      console.error(error)
+      return error
+    })
+  }
 
   public getBook = (symbol): Promise<OrderBook> => this.api.book({ symbol })
 

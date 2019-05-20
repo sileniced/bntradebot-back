@@ -1,17 +1,17 @@
-export const calcWeight = (prevScore, prevWeight, prevOptimalScore) => prevWeight + (
+export const calcWeight = (score, weight, optimalScore) => weight + (
   (
     (
-      prevWeight * (
-        (prevOptimalScore > 0.5 && prevScore > 0.5) || (prevOptimalScore < 0.5 && prevScore < 0.5)
-          ? 2 - Math.abs(prevScore - prevOptimalScore)
-          : 1 - Math.abs(prevOptimalScore - prevScore)
+      weight * (
+        (optimalScore > 0.5 && score > 0.5) || (optimalScore < 0.5 && score < 0.5)
+          ? 2 - Math.abs(score - optimalScore)
+          : 1 - Math.abs(optimalScore - score)
       )
-    ) - prevWeight
+    ) - weight
   ) * (
     (
-      prevOptimalScore > 0.5
-        ? (prevOptimalScore - 0.5)
-        : (0.5 - prevOptimalScore)
+      optimalScore > 0.5
+        ? (optimalScore - 0.5)
+        : (0.5 - optimalScore)
     ) * 2
   )
 )

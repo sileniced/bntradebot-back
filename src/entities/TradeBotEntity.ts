@@ -1,10 +1,9 @@
-import { BaseEntity, Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm'
+import { BaseEntity, Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import User from './User'
 import { parseDropCode } from '../services/utils'
 import { OrderSide } from 'binance-api-node'
 import { Trade } from '../app/TradeBot/TradeBot'
 import SavedOrder from './SavedOrder'
-import ScoresWeightsEntityV1 from './ScoresWeightsEntityV1'
 
 export interface DroppedPairEntity {
   pair: string
@@ -46,12 +45,6 @@ class TradeBotEntity extends BaseEntity {
   @OneToMany(() => SavedOrder, savedOrders => savedOrders.tradeBotEntity)
   public savedOrders: SavedOrder
 
-  @OneToOne(() => ScoresWeightsEntityV1, {
-    cascade: true
-  })
-  @JoinColumn()
-  public scoresWeightsV1: ScoresWeightsEntityV1
-
   @Column('timestamp with time zone')
   public tradeTime: Date
 
@@ -59,7 +52,7 @@ class TradeBotEntity extends BaseEntity {
   public symbols: string[]
 
   @Column('simple-array')
-  public pairs: string[]
+  public pairs: string[] = []
 
   @Column('simple-array')
   public markets: string[]
