@@ -9,7 +9,7 @@ import {
   SmaMoveBackNames
 } from '../utils'
 import { bearish, bullish, CandleStickLevels } from '../CandleStickAnalysis'
-import { CandleStickBullBear, IntervalDataSWA } from '../../../entities/ScoresWeightsEntityV1'
+import { CandleStickBullBear, IntervalDataSWA } from '../../../entities/ScoresWeightsModelV1'
 
 export const initWeights = () => Analysis.intervalList.reduce((acc, interval, intervalIdx) => {
   acc[interval] = {

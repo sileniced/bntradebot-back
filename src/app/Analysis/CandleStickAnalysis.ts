@@ -1,6 +1,6 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import * as TI from 'technicalindicators'
-import { CandleStickData } from '../../entities/ScoresWeightsEntityV1'
+import { CandleStickData } from '../../entities/ScoresWeightsModelV1'
 import { CandlestickNames } from './utils'
 
 export const settings = {

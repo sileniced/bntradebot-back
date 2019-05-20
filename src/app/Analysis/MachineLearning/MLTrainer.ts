@@ -10,7 +10,7 @@ import {
   OscillatorSW,
   PairData,
   TechAnalysis
-} from '../../../entities/ScoresWeightsEntityV1'
+} from '../../../entities/ScoresWeightsModelV1'
 import BinanceApi from '../../Binance'
 import StockData from 'technicalindicators/declarations/StockData'
 import Analysis from '../index'
@@ -98,7 +98,7 @@ class MLTrainer implements IMachineLearningTrainer {
   // private show = true
 
   private trainingExecute = async (): Promise<void> => {
-    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-5)
+    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-4)
     const now = Date.now() - (1000 * 60 * 10)
 
     let history = {}
@@ -592,7 +592,7 @@ class MLTrainer implements IMachineLearningTrainer {
     await Promise.all(pairWeightsPromises)
 
     // this.trainingExecute().catch(console.error)
-    setInterval(this.trainingExecute, 12000)
+    setInterval(this.trainingExecute, 15000)
   }
 
 }

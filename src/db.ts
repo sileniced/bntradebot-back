@@ -4,7 +4,6 @@ import { CustomNamingStrategy } from './customNamingStrategy'
 import User from './entities/User'
 import SavedOrder from './entities/SavedOrder'
 import TradeBotEntity from './entities/TradeBotEntity'
-import ScoresWeightsEntityV1 from './entities/ScoresWeightsEntityV1'
 import PairWeightsEntityV1 from './entities/PairWeightsEntityV1'
 
 const db = () =>
@@ -13,7 +12,6 @@ const db = () =>
       User,
       SavedOrder,
       TradeBotEntity,
-      ScoresWeightsEntityV1,
       PairWeightsEntityV1,
     ],
     logging: false,

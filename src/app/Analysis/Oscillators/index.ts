@@ -1,7 +1,7 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import Values from './Values'
 import Scoring from './Scoring'
-import { OscillatorSW } from '../../../entities/ScoresWeightsEntityV1'
+import { OscillatorSW } from '../../../entities/ScoresWeightsModelV1'
 import { OscillatorNames } from '../utils'
 
 export const Oscillators = (

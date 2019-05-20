@@ -18,7 +18,7 @@ import SavedOrder from '../entities/SavedOrder'
 import TradeBot from './TradeBot/TradeBot'
 import CreateTechAnalysisData from './Analysis/CreateTechAnalysisData'
 import StockData from 'technicalindicators/declarations/StockData'
-import { PairData } from '../entities/ScoresWeightsEntityV1'
+import { PairData } from '../entities/ScoresWeightsModelV1'
 // import TradeBotEntity from '../entities/TradeBotEntity'
 // import { Raw } from 'typeorm'
 
@@ -54,7 +54,7 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: /*600000*/ 10000
+    globalTradeInterval: 600000 /*10000*/
   }
 
   private prevPairData: { [pair: string]: PairData } = {}
@@ -65,32 +65,15 @@ class BinanceApi {
 
     this.activeTradeBotUserIds.forEach(id => {
 
-      // this.prevTradeBot[id] = new TradeBot(this.activeTradeBotUsers[id], this.prevTradeBot[id])
-      // this.prevTradeBot[id].run(this)
-      // .catch((e) => {
-      //   console.error(e)
-      //   throw e
-      // })
-
       new TradeBot(this.activeTradeBotUsers[id], this.prevPairData).run(this)
       .then(({ pairData, pairs }) => {
         pairs.forEach(pair => {
           this.prevPairData[pair.symbol] = pairData[pair.symbol]
         })
       })
-
+      .catch(console.error)
 
     })
-
-
-    // TradeBotEntity.find({
-    //   relations: ['scoresWeightsV1'],
-    //   where: {
-    //     tradeTime: Raw(alias => `${alias} < NOW() - INTERVAL '1 DAY'`)
-    //   },
-    // }).then(tradeBotEntity => {
-    //   tradeBotEntity.forEach(entity => entity.scoresWeightsV1.remove())
-    // })
   }
 
   constructor() {

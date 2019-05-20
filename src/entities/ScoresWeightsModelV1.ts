@@ -1,5 +1,3 @@
-import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
-
 export interface MoveBackSW {
   [maLengthIdx: number]: {
     w: number
@@ -127,16 +125,3 @@ const test = (property: string, data: object, acc: number = 0): number => {
     return Object.keys(data).map(key => test(property, data[key], acc)).reduce((sum, n) => sum + n);
   }
 }
-
-@Entity()
-class ScoresWeightsEntityV1 extends BaseEntity {
-
-  @PrimaryGeneratedColumn()
-  public id: number
-
-  @Column('simple-json')
-  public scoresWeights: ScoresWeightsEntityV1Model
-
-}
-
-export default ScoresWeightsEntityV1

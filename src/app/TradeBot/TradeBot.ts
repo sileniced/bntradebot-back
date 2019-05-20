@@ -5,7 +5,7 @@ import Analysis, { AssignedPair } from '../Analysis'
 import Logger from '../../services/Logger'
 import TradeBotEntity, { TradePairEntity } from '../../entities/TradeBotEntity'
 import SavedOrder from '../../entities/SavedOrder'
-import { PairData } from '../../entities/ScoresWeightsEntityV1'
+import { PairData } from '../../entities/ScoresWeightsModelV1'
 import BinanceApi from '../Binance'
 import PairWeightsEntityV1 from '../../entities/PairWeightsEntityV1'
 import MLTrainer from '../Analysis/MachineLearning/MLTrainer'
@@ -145,7 +145,7 @@ class TradeBot implements ITradeBot {
         // get prevOptimalScore
         return MLTrainer.getPrevOptimalScorePromise(pair.symbol, Binance)
         .then(prevOptimalScore => {
-          prevPairData.o = prevOptimalScore
+          pairDataMutable.o = prevOptimalScore
 
           Analysis.intervalList.forEach(interval => {
 
@@ -187,10 +187,18 @@ class TradeBot implements ITradeBot {
             pairDataMutable.a
           )
 
+          PairWeightsEntityV1.find({ where: { pairName: pair.symbol } })
+          .then((result: PairWeightsEntityV1[]): PairWeightsEntityV1 => result[0])
+          .then(pairEntity => {
+            pairEntity.weights = pairDataMutable.a
+            pairEntity.save().catch(console.error)
+          })
+          .catch(console.error)
+
           return pairDataMutable
 
         })
-      } else{
+      } else {
         return Promise.resolve(this.pairData[pair.symbol])
       }
     })
@@ -254,8 +262,11 @@ class TradeBot implements ITradeBot {
     const addToFinalPairs = (pair: Trade) => {
       pair.dollarValue = pair.baseAmount * this.prices[`${pair.baseSymbol}BTC`] * this.prices['BTCUSDT']
       pair.feeDollar = pair.dollarValue * 0.0075
-      /** DEV HERE*/
+// HERE HERE HERE HERE
+// HERE HERE HERE HERE
       this.tradePromises.push(Binance.newOrder/*Test*/(this.user, pair.feeDollar, {
+// HERE HERE HERE HERE
+// HERE HERE HERE HERE
           symbol: pair.pair,
           side: pair.side,
           quantity: pair.baseAmount.toString(),
@@ -437,11 +448,10 @@ class TradeBot implements ITradeBot {
     this.entity.dollarDiffPostTrade = this.dollarDiff
     const savedEntity = await this.entity.save()
 
-    await Promise.all(this.savedOrders.map(order => {
+    Promise.all(this.savedOrders.map(order => {
       order.tradeBotEntity = savedEntity
-      return order.save()
-    }))
-    .catch(console.error)
+      order.save().catch(console.error)
+    })).catch(console.error)
 
     return {
       pairData: this.pairData,

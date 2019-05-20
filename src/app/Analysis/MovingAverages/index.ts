@@ -1,7 +1,7 @@
 import StockData from 'technicalindicators/declarations/StockData'
 import Values from './Values'
 import Scoring from './Scoring'
-import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsEntityV1'
+import { CrossSW, MoveBackSW } from '../../../entities/ScoresWeightsModelV1'
 import { MoveBackNames } from '../utils'
 
 export const MovingAverages = (

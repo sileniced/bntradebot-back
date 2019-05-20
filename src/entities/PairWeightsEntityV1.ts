@@ -1,5 +1,5 @@
 import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
-import { IntervalData } from './ScoresWeightsEntityV1'
+import { IntervalData } from './ScoresWeightsModelV1'
 
 @Entity()
 class PairWeightsEntityV1 extends BaseEntity {

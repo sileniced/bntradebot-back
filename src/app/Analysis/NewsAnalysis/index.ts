@@ -32,7 +32,6 @@ interface SymbolAnalysisTotals {
 
 interface IAnalysisNews {
   symbolAnalysis: { [symbol: string]: number }
-
   run(logger: Logger): Promise<void>
 }
 

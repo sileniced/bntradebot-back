@@ -1,10 +1,9 @@
 import { CandleChartInterval, OrderSide, Symbol } from 'binance-api-node'
 
 import StockData from 'technicalindicators/declarations/StockData'
-import AnalysisNews from './NewsAnalysis'
 import Logger from '../../services/Logger'
 import PriceChangeAnalysis from './PriceChangeAnalysis'
-import { PairData } from '../../entities/ScoresWeightsEntityV1'
+import { PairData } from '../../entities/ScoresWeightsModelV1'
 import { SMA } from 'technicalindicators'
 import BinanceApi from '../Binance'
 import MLTrainer from './MachineLearning/MLTrainer'
@@ -42,7 +41,7 @@ export interface IAnalysis {
 
   assignedPair: { [pair: string]: AssignedPair }
 
-  newsScore: AnalysisNews
+  // newsScore: AnalysisNews
   symbolPie: { [pair: string]: number }
 }
 
@@ -84,7 +83,7 @@ class Analysis implements IAnalysis {
     cross: 0.256,
     priceChange: 0.235
   }
-  static readonly symbolPieWeights = { tech: 0.5, news: 0.05, markets: 0.45 }
+  static readonly symbolPieWeights = { tech: 0.8, /*news: 0.05, */markets: 0.2 }
 
   private readonly symbols: string[] = []
   private readonly pairs: string[] = []
@@ -100,7 +99,7 @@ class Analysis implements IAnalysis {
 
   public assignedPair: { [pair: string]: AssignedPair } = {}
 
-  public newsScore: AnalysisNews
+  // public newsScore: AnalysisNews
   public symbolPie: { [pair: string]: number } = {}
 
   private symbolTotals: { [pair: string]: number } = {}
@@ -162,8 +161,8 @@ class Analysis implements IAnalysis {
 
   public async run(logger: Logger, Binance: BinanceApi): Promise<void> {
     const start = Date.now()
-    this.newsScore = new AnalysisNews({ symbols: this.symbols })
-    const newsAnalysisPromise = this.newsScore.run(logger)
+    // this.newsScore = new AnalysisNews({ symbols: this.symbols })
+    // const newsAnalysisPromise = this.newsScore.run(logger)
 
     const techAnalysisPromises: Promise<void>[] = []
 
@@ -187,14 +186,9 @@ class Analysis implements IAnalysis {
           throw e
         }))
       })
-
-
     })
 
     await Promise.all(techAnalysisPromises)
-
-    this.apiCalls = techAnalysisPromises.length
-
     this.pairsInfo.forEach(pair => {
       Analysis.intervalList.forEach(interval => {
         const pairData: PairData = this.pairData[pair.symbol]
@@ -206,6 +200,8 @@ class Analysis implements IAnalysis {
         this.techPairScore[pair.symbol] = MLTrainer.sumIntervalScoresAndSumPairScore(pairData.a)
       })
     })
+
+    this.apiCalls = techAnalysisPromises.length
 
     /** this.marketScore[quoteSymbol | altsMarket] = */
     const qen = this.marketSymbols.length
@@ -320,20 +316,24 @@ class Analysis implements IAnalysis {
     }
     logger.pairAnalysis()
 
-    await newsAnalysisPromise
-    logger.newsPosts()
+    // await newsAnalysisPromise
+    // logger.newsPosts()
 
 
     const sen = this.symbols.length
     for (let i = 0; i < sen; i++) {
       const symbol = this.symbols[i]
 
-      const newsScore = this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]
+      // const newsScore = this.newsScore.symbolAnalysis[symbol] < 0 ? 0 : this.newsScore.symbolAnalysis[symbol]
 
       const marketSymbol = this.marketSymbols.includes(symbol) ? symbol : 'ALTS'
+
+      // console.log('this.marketScore[marketSymbol].battleScore = ', symbol, this.marketScore[marketSymbol].battleScore)
+      // console.log('this.techSymbolScore[symbol] = ', symbol, this.techSymbolScore[symbol])
+      // console.log('this.newsScore.symbolAnalysis[symbol] = ', symbol, this.newsScore.symbolAnalysis[symbol])
       this.symbolTotals[symbol] += this.marketScore[marketSymbol].battleScore * Analysis.symbolPieWeights.markets
       this.symbolTotals[symbol] += this.techSymbolScore[symbol] * Analysis.symbolPieWeights.tech
-      this.symbolTotals[symbol] += newsScore * Analysis.symbolPieWeights.news
+      // this.symbolTotals[symbol] += newsScore * Analysis.symbolPieWeights.news
       this.allTotals += this.symbolTotals[symbol]
     }
 
