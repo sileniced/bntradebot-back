@@ -239,12 +239,10 @@ class Analysis implements IAnalysis {
           const intervalCollector = this.pairData[pair].a[interval]
           const techAnalysis = intervalCollector.a.tech.a
 
-          techAnalysis.priceChange.s = PriceChangeAnalysis(candles)
           MLTrainer.getMovingAveragesScores(candles, techAnalysis)
           MLTrainer.getOscillatorScores(candles, techAnalysis)
           MLTrainer.getCandleStickScore(candles, techAnalysis)
-
-
+          techAnalysis.priceChange.s = PriceChangeAnalysis(candles)
 
           // if (!this.dataCollector.pairs) return
           // this.dataCollector.pairs[pair].a[interval] = {
@@ -354,6 +352,15 @@ class Analysis implements IAnalysis {
     await Promise.all(techAnalysisPromises)
 
     this.apiCalls = techAnalysisPromises.length
+
+    this.pairsInfo.forEach(pair => {
+      Analysis.intervalList.forEach(interval => {
+        const techAnalysis = this.pairData[pair.symbol].a[interval].a.tech.a
+        techAnalysis.moveBack.s = MLTrainer.sumMovingAveragesScore(techAnalysis.moveBack.a)
+        techAnalysis.oscillators.s = MLTrainer.sumOscillatorsScore(techAnalysis.oscillators.a)
+
+      })
+    })
 
     /** this.marketScore[quoteSymbol | altsMarket] = */
     const qen = this.marketSymbols.length

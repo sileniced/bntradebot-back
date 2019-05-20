@@ -4,7 +4,9 @@ import { Symbol } from 'binance-api-node'
 import {
   CandleStickData,
   CandleStickLevelSW,
-  IntervalData, IntervalDataSWA, MoveBackSW,
+  IntervalData,
+  IntervalDataSWA,
+  MoveBackSW,
   OscillatorSW,
   PairData,
   TechAnalysis
@@ -140,10 +142,10 @@ class MLTrainer implements IMachineLearningTrainer {
           //   // console.log(util.inspect(techAnalysis, false, null, true))
           // }
 
-          this.MovingAverages(candles, techAnalysis, optimalScore) // moveBack & cross
-          this.PriceChange(candles, techAnalysis, optimalScore)
-          this.Oscillators(candles, techAnalysis, optimalScore)
-          this.CandleSticks(candles, techAnalysis, optimalScore)
+          MLTrainer.MovingAverages(candles, techAnalysis, optimalScore) // moveBack & cross
+          MLTrainer.PriceChange(candles, techAnalysis, optimalScore)
+          MLTrainer.Oscillators(candles, techAnalysis, optimalScore)
+          MLTrainer.CandleSticks(candles, techAnalysis, optimalScore)
 
           // if (this.show) {
           //   // console.log('after techAnalysis = ', pair, interval)
@@ -283,7 +285,7 @@ class MLTrainer implements IMachineLearningTrainer {
     })
   }
 
-  private MovingAverages(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+  private static MovingAverages(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
     let moveBackData = MLTrainer.getMovingAveragesScores(candles, techAnalysis)
     MLTrainer.setMovingAveragesWeights(moveBackData, moveBackData, optimalScore, techAnalysis)
   }
@@ -292,12 +294,25 @@ class MLTrainer implements IMachineLearningTrainer {
     candles: StockData,
     techAnalysis: TechAnalysis
   ) {
-    let moveBackData = MovingAveragesML(
+    return MovingAveragesML(
       candles,
       techAnalysis.moveBack.a,
       techAnalysis.cross
     )
-    return moveBackData
+  }
+
+  static sumMovingAveragesScore = moveBackData => {
+    const emaMoveBackScore = EmaMoveBackNames.reduce((acc, [name]) => {
+      const { s: score, w: weight } = moveBackData[MoveBackIdxs[name]]
+      return acc + (score * weight)
+    }, 0)
+
+    const smaMoveBackScore = SmaMoveBackNames.reduce((acc, [name]) => {
+      const { s: score, w: weight } = moveBackData[MoveBackIdxs[name]]
+      return acc + (score * weight)
+    }, 0)
+
+    return (emaMoveBackScore + smaMoveBackScore) / 2
   }
 
   static setMovingAveragesWeights(
@@ -315,18 +330,18 @@ class MLTrainer implements IMachineLearningTrainer {
       return acc + weight
     }, 0)
 
-    const emaMoveBackScore = EmaMoveBackNames.reduce((acc, [name]) => {
-      const score = moveBackDataScores[MoveBackIdxs[name]].s
-      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
-      weight /= emaMoveBackTotalWeights
-      return acc + (score * weight)
-    }, 0)
-
     const smaMoveBackTotalWeights = SmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
       let weight = moveBackDataWeights[MoveBackIdxs[name]].w
       weight = calcWeight(score ? 0.75 : 0.25, weight, optimalScore)
       return acc + weight
+    }, 0)
+
+    const emaMoveBackScore = EmaMoveBackNames.reduce((acc, [name]) => {
+      const score = moveBackDataScores[MoveBackIdxs[name]].s
+      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
+      weight /= emaMoveBackTotalWeights
+      return acc + (score * weight)
     }, 0)
 
     const smaMoveBackScore = SmaMoveBackNames.reduce((acc, [name]) => {
@@ -351,18 +366,23 @@ class MLTrainer implements IMachineLearningTrainer {
     )
   }
 
-  private Oscillators(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+  private static Oscillators(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
     let oscillatorData = MLTrainer.getOscillatorScores(candles, techAnalysis)
     MLTrainer.setOscillatorWeights(oscillatorData, oscillatorData, optimalScore, techAnalysis)
   }
 
   static getOscillatorScores(candles: StockData, techAnalysis: TechAnalysis) {
-    let oscillatorData: OscillatorSW = OscillatorsML(
+    return OscillatorsML(
       candles,
       techAnalysis.oscillators.a
     )
-    return oscillatorData
   }
+
+  static sumOscillatorsScore = oscillatorData => OscillatorNames.reduce((acc, name) => {
+    const {s: score, w: weight} = oscillatorData[OscillatorIdxs[name]]
+    return acc + (score * weight)
+  }, 0)
+
 
   static setOscillatorWeights(
     oscillatorDataWeights: OscillatorSW,
@@ -391,7 +411,7 @@ class MLTrainer implements IMachineLearningTrainer {
     )
   }
 
-  private PriceChange(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+  private static PriceChange(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
     techAnalysis.priceChange.s = PriceChangeAnalysis(candles)
     MLTrainer.setPriceChangeWeights(techAnalysis, techAnalysis, optimalScore)
   }
@@ -408,18 +428,22 @@ class MLTrainer implements IMachineLearningTrainer {
     )
   }
 
-  private CandleSticks(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
+  private static CandleSticks(candles: StockData, techAnalysis: TechAnalysis, optimalScore) {
     let candleStickData = MLTrainer.getCandleStickScore(candles, techAnalysis)
     MLTrainer.setCandleSticksWeights(candleStickData, candleStickData, optimalScore, techAnalysis)
   }
 
   static getCandleStickScore(candles: StockData, techAnalysis: TechAnalysis) {
-    let candleStickData: CandleStickData = CandleStickAnalysisML(
+    return CandleStickAnalysisML(
       candles,
       techAnalysis.candlesticks.a
     )
-    return candleStickData
   }
+
+  static sumCandleStickScores = candleStickData => CandleStickLevels.reduce((acc, [level]) => {
+    const levelData = candleStickData[level]
+    return acc + (levelData.s * levelData.w)
+  }, 0)
 
   static setCandleSticksWeights(
     candleStickDataWeights: CandleStickData,
