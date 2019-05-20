@@ -258,7 +258,11 @@ class TradeBot implements ITradeBot {
     //       })) as ScoresWeightsEntityV1Model
     // })
 
-
+    this.analysis = new Analysis({
+      getNormalizedSymbols: this.getNormalizedSymbols,
+      pairsInfo: this.pairsInfo,
+      pairData: this.pairData
+    })
 
     const analysisPromise = this.analysis.run(logger, Binance)
 

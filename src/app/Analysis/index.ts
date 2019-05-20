@@ -8,6 +8,7 @@ import { PairData } from '../../entities/ScoresWeightsEntityV1'
 import { SMA } from 'technicalindicators'
 import BinanceApi from '../Binance'
 import MLTrainer from './MachineLearning/MLTrainer'
+// import * as util from 'util'
 
 export interface AssignedPair {
   pair: string,

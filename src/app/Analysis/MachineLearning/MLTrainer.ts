@@ -219,9 +219,9 @@ class MLTrainer implements IMachineLearningTrainer {
   static sumIntervalScoresAndSumPairScore = (pairData: { [interval: string]: IntervalDataSWA }) => {
     return Analysis.intervalList.reduce((acc, interval) => {
       let techAnalysis: TechAnalysis = pairData[interval].a.tech.a
-      return acc + MLTrainer.techNames.reduce((acc, name) => {
+      return acc + (pairData[interval].w * MLTrainer.techNames.reduce((acc, name) => {
         return acc + (techAnalysis[name].s * techAnalysis[name].w)
-      }, 0)
+      }, 0))
     }, 0)
   }
 
