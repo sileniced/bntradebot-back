@@ -262,8 +262,6 @@ class Analysis implements IAnalysis {
       return this.marketScore[quoteSymbolA].battleWins - this.marketScore[quoteSymbolB].battleWins
     })
 
-    console.log('this.marketScore[marketScoreSorted[0]].battleScore = ', this.marketScore[marketScoreSorted[0]].battleScore)
-    console.log('this.marketSymbols.length = ', this.marketSymbols.length)
     if (this.marketScore[marketScoreSorted[0]].battleWins === this.marketSymbols.length - 1) {
       this.allBattlesWon = marketScoreSorted[0]
     }
@@ -350,8 +348,7 @@ class Analysis implements IAnalysis {
     for (let i = 0; i < sen; i++) {
       this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
     }
-    
-    console.log('this.fullBattleScore = ', this.allBattlesWon)
+
 
     if (typeof this.allBattlesWon === 'string') {
       this.pairsPerSymbol[this.allBattlesWon].forEach(pair => {
