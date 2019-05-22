@@ -107,6 +107,8 @@ class Analysis implements IAnalysis {
 
   private pairData: { [pair: string]: PairData }
 
+  private fullBattleScore: string | null = null
+
   constructor({ pairsInfo, getNormalizedSymbols, pairData }: AnalysisInput) {
 
     this.pairsInfo = pairsInfo
@@ -262,6 +264,7 @@ class Analysis implements IAnalysis {
     .forEach((quoteSymbol, idx, src) => {
       const { battleWins, battleScore } = this.marketScore[quoteSymbol]
       this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
+      if (battleScore === this.marketSymbols.length - 1) this.fullBattleScore = quoteSymbol
       if (this.marketScore[quoteSymbol].battleScore !== 0 && src[idx + 1]) {
         const nextMarket = this.marketScore[src[idx + 1]]
         if (nextMarket.battleWins > battleWins) {
@@ -341,6 +344,19 @@ class Analysis implements IAnalysis {
     for (let i = 0; i < sen; i++) {
       this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
     }
+
+    if (typeof this.fullBattleScore === 'string') {
+      this.pairsPerSymbol[this.fullBattleScore].forEach(pair => {
+        if (pair.quoteAsset === this.fullBattleScore) {
+          this.symbolPie[pair.quoteAsset] += this.symbolPie[pair.baseAsset]
+          this.symbolPie[pair.baseAsset] = 0
+        } else {
+          this.symbolPie[pair.baseAsset] += this.symbolPie[pair.quoteAsset]
+          this.symbolPie[pair.quoteAsset] = 0
+        }
+      })
+    }
+
     logger.addTime({ item: 'analysis', time: Date.now() - start })
   }
 }
