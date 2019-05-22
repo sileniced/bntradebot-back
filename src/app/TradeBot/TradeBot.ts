@@ -268,7 +268,7 @@ class TradeBot implements ITradeBot {
       pair.feeDollar = pair.dollarValue * 0.0075
 // HERE HERE HERE HERE
 // HERE HERE HERE HERE
-      this.tradePromises.push(Binance.newOrder/*Test*/(this.user, pair.feeDollar, {
+      this.tradePromises.push(Binance.newOrderTest(this.user, pair.feeDollar, {
 // HERE HERE HERE HERE
 // HERE HERE HERE HERE
           symbol: pair.pair,
