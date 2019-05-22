@@ -262,8 +262,12 @@ class Analysis implements IAnalysis {
       return this.marketScore[quoteSymbolA].battleWins - this.marketScore[quoteSymbolB].battleWins
     })
 
-    if (this.marketScore[marketScoreSorted[0]].battleWins === this.marketSymbols.length - 1) {
-      this.allBattlesWon = marketScoreSorted[0]
+    console.log('this.marketScore[marketScoreSorted[qen - 1]].battleWins = ', this.marketScore[marketScoreSorted[qen - 1]].battleWins)
+    console.log('qen - 1 = ', qen - 1)
+
+
+    if (this.marketScore[marketScoreSorted[qen - 1]].battleWins === qen - 1) {
+      this.allBattlesWon = marketScoreSorted[qen - 1]
     }
 
     marketScoreSorted.forEach((quoteSymbol, idx, src) => {
@@ -349,16 +353,18 @@ class Analysis implements IAnalysis {
       this.symbolPie[this.symbols[i]] += this.symbolTotals[this.symbols[i]] / this.allTotals
     }
 
-
+    console.log('this.allBattlesWon = ', this.allBattlesWon)
     if (typeof this.allBattlesWon === 'string') {
       this.pairsPerSymbol[this.allBattlesWon].forEach(pair => {
         if (pair.quoteAsset === this.allBattlesWon) {
           if (this.techPairScore[pair.symbol] < 0.5) {
+            console.log('pair.symbol = ', pair.symbol)
             this.symbolPie[pair.quoteAsset] += this.symbolPie[pair.baseAsset]
             this.symbolPie[pair.baseAsset] = 0
           }
         } else {
           if (this.techPairScore[pair.symbol] > 0.5) {
+            console.log('pair.symbol = ', pair.symbol)
             this.symbolPie[pair.baseAsset] += this.symbolPie[pair.quoteAsset]
             this.symbolPie[pair.quoteAsset] = 0
           }
