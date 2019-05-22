@@ -18,7 +18,7 @@ export interface AssignedPair {
 export interface AnalysisInput {
   pairsInfo: Symbol[]
   getNormalizedSymbols: () => { [symbol: string]: number }
-  pairData: { [pair: string ]: PairData }
+  pairData: { [pair: string]: PairData }
 }
 
 export interface MarketAnalysisResult {
@@ -254,17 +254,21 @@ class Analysis implements IAnalysis {
       })
     })
 
-    this.marketSymbols
+    const marketScoreSorted = this.marketSymbols
     .sort((quoteSymbolA, quoteSymbolB) => {
       if (this.marketScore[quoteSymbolA].battleWins === this.marketScore[quoteSymbolB].battleWins) {
         return this.marketScore[quoteSymbolA].score - this.marketScore[quoteSymbolB].score
       }
       return this.marketScore[quoteSymbolA].battleWins - this.marketScore[quoteSymbolB].battleWins
     })
-    .forEach((quoteSymbol, idx, src) => {
+
+    if (this.marketScore[marketScoreSorted[0]].battleScore === this.marketSymbols.length - 1) {
+      this.fullBattleScore = marketScoreSorted[0]
+    }
+
+    marketScoreSorted.forEach((quoteSymbol, idx, src) => {
       const { battleWins, battleScore } = this.marketScore[quoteSymbol]
       this.marketScore[quoteSymbol].battleScore = battleScore < 0 ? 0 : battleWins * battleScore
-      if (battleScore === this.marketSymbols.length - 1) this.fullBattleScore = quoteSymbol
       if (this.marketScore[quoteSymbol].battleScore !== 0 && src[idx + 1]) {
         const nextMarket = this.marketScore[src[idx + 1]]
         if (nextMarket.battleWins > battleWins) {
@@ -348,11 +352,15 @@ class Analysis implements IAnalysis {
     if (typeof this.fullBattleScore === 'string') {
       this.pairsPerSymbol[this.fullBattleScore].forEach(pair => {
         if (pair.quoteAsset === this.fullBattleScore) {
-          this.symbolPie[pair.quoteAsset] += this.symbolPie[pair.baseAsset]
-          this.symbolPie[pair.baseAsset] = 0
+          if (this.techPairScore[pair.symbol] < 0.5) {
+            this.symbolPie[pair.quoteAsset] += this.symbolPie[pair.baseAsset]
+            this.symbolPie[pair.baseAsset] = 0
+          }
         } else {
-          this.symbolPie[pair.baseAsset] += this.symbolPie[pair.quoteAsset]
-          this.symbolPie[pair.quoteAsset] = 0
+          if (this.techPairScore[pair.symbol] > 0.5) {
+            this.symbolPie[pair.baseAsset] += this.symbolPie[pair.quoteAsset]
+            this.symbolPie[pair.quoteAsset] = 0
+          }
         }
       })
     }
