@@ -107,7 +107,7 @@ class Analysis implements IAnalysis {
 
   private pairData: { [pair: string]: PairData }
 
-  private allBattlesWon: string | null = null
+  // private allBattlesWon: string | null = null
 
   constructor({ pairsInfo, getNormalizedSymbols, pairData }: AnalysisInput) {
 
@@ -266,9 +266,9 @@ class Analysis implements IAnalysis {
     console.log('qen - 1 = ', qen - 1)
 
 
-    if (this.marketScore[marketScoreSorted[qen - 1]].battleWins === qen - 1) {
-      this.allBattlesWon = marketScoreSorted[qen - 1]
-    }
+    // if (this.marketScore[marketScoreSorted[qen - 1]].battleWins === qen - 1) {
+    //   this.allBattlesWon = marketScoreSorted[qen - 1]
+    // }
 
     marketScoreSorted.forEach((quoteSymbol, idx, src) => {
       const { battleWins, battleScore } = this.marketScore[quoteSymbol]
