@@ -262,10 +262,9 @@ class Analysis implements IAnalysis {
       return this.marketScore[quoteSymbolA].battleWins - this.marketScore[quoteSymbolB].battleWins
     })
 
-    console.log('this.marketScore[marketScoreSorted[qen - 1]].battleWins = ', this.marketScore[marketScoreSorted[qen - 1]].battleWins)
-    console.log('qen - 1 = ', qen - 1)
-
-
+    // console.log('this.marketScore[marketScoreSorted[qen - 1]].battleWins = ', this.marketScore[marketScoreSorted[qen - 1]].battleWins)
+    // console.log('qen - 1 = ', qen - 1)
+    
     // if (this.marketScore[marketScoreSorted[qen - 1]].battleWins === qen - 1) {
     //   this.allBattlesWon = marketScoreSorted[qen - 1]
     // }
