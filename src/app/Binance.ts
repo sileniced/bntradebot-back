@@ -54,7 +54,8 @@ class BinanceApi {
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
   private readonly settings = {
-    globalTradeInterval: 600000 /*10000*/
+    globalCollectDataInterval: 600000,
+    globalTradeInterval: 1000 * 60 * 60 * 4 /*600000*/ /*10000*/
   }
 
   private prevPairData: { [pair: string]: PairData } = {}
@@ -76,6 +77,15 @@ class BinanceApi {
     })
   }
 
+  private tradeBotCollect = (): void => {
+    this.activeTradeBotUserIds.forEach(id => {
+
+      new TradeBot(this.activeTradeBotUsers[id], this.prevPairData).runCollect(this)
+      .catch(console.error)
+
+    })
+  }
+
   constructor() {
     this.api = binance()
     this.exchangeInfo = this.api.exchangeInfo()
@@ -90,8 +100,11 @@ class BinanceApi {
         this.activateTradeBot(user)
       })
 
-      if (startNow) this.tradeBotExecute()
+      // if (startNow) this.tradeBotExecute()
+      if (startNow) this.tradeBotCollect()
+
       setInterval(this.tradeBotExecute, this.settings.globalTradeInterval)
+      setInterval(this.tradeBotCollect, this.settings.globalCollectDataInterval)
     })
   }
 

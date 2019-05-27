@@ -1,20 +1,22 @@
-export const calcWeight = (score, weight, optimalScore) => weight + (
-  (
+export function calcWeight(score: number, weight: number, optimalScore: number): number {
+  return weight + (
     (
-      weight * (
-        (optimalScore > 0.5 && score > 0.5) || (optimalScore < 0.5 && score < 0.5)
-          ? 2 - Math.abs(score - optimalScore)
-          : 1 - Math.abs(optimalScore - score)
-      )
-    ) - weight
-  ) * (
-    (
-      optimalScore > 0.5
-        ? (optimalScore - 0.5)
-        : (0.5 - optimalScore)
-    ) * 2
+      (
+        weight * (
+          (optimalScore > 0.5 && score > 0.5) || (optimalScore < 0.5 && score < 0.5)
+            ? 2 - Math.abs(score - optimalScore)
+            : 1 - Math.abs(optimalScore - score)
+        )
+      ) - weight
+    ) * (
+      (
+        optimalScore > 0.5
+          ? (optimalScore - 0.5)
+          : (0.5 - optimalScore)
+      ) / 10
+    )
   )
-)
+}
 
 export interface MachineLearningData {
   name: string,
@@ -30,7 +32,7 @@ export const addMachineLearningWeights = (
   log: Boolean = false
 ): [string, number][] => {
 
-  let total = 0
+  let total: number = 0
   const newWeights = data.map(row => {
     const newWeight = calcWeight(
       row.prevData.s,
@@ -43,7 +45,7 @@ export const addMachineLearningWeights = (
 
   })
 
-  const artifact: [string, number][] = newWeights.map(([name, weight]) => [name, weight / total])
+  const artifact: [string, number][] = newWeights.map(([name, weight]: [string, number]) => [name, weight / total])
 
   log && Math.random() > 0.1 && console.table(data.map((period, idx) => ({
     name: period.name,

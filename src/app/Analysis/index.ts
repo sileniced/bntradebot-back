@@ -60,7 +60,7 @@ class Analysis implements IAnalysis {
     }
   }
 
-  static getPrevOptimalSmaScore = (candles: StockData, period = 12) => {
+  static getPrevOptimalSmaScore = (candles: StockData, period: number = 12) => {
     const [previous, current] = SMA.calculate({
       values: candles.close,
       period

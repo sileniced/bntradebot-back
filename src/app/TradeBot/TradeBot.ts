@@ -88,13 +88,48 @@ class TradeBot implements ITradeBot {
     this.balancePostTrade = this.getNormalizedSymbols()
 
     this.prevPairData = prevPairData
-
   }
 
   protected readonly getNormalizedSymbols = (): { [symbol: string]: number } => {
     const obj = {}
     for (let i = 0, len = this.user.symbols.length; i < len; i++) obj[this.user.symbols[i]] = 0
     return obj
+  }
+
+  public async runCollect(Binance: BinanceApi) {
+    await TradeBotEntity.find({
+      where: {
+        user: this.user
+      },
+      order: {
+        id: 'DESC'
+      },
+      take: 1
+    }).then(entity => {
+
+      this.entity = entity[0]
+      delete this.entity.id
+      this.entity.user = this.user
+      this.entity.droppedPairs = []
+      this.entity.tradePairs = []
+      this.entity.dollarDiffPostTrade = 0
+      this.entity.tradeTime = new Date()
+
+      return Promise.all(this.entity.pairs.map(pair => Binance.getAvgPrice(pair)))
+    }).then(prices => {
+
+      let pricesPairs = {}
+
+      this.entity.pairs.forEach((pair, idx) => {
+        pricesPairs[pair] = prices[idx]
+      })
+
+      this.entity.pricesPairs = pricesPairs
+    })
+
+    console.log('this.entity = ', this.entity)
+
+    this.entity.save().catch(console.error)
   }
 
   public async run(Binance: BinanceApi) {

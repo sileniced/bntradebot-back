@@ -30,6 +30,7 @@ import { MovingAverages } from '../MovingAverages'
 import { Oscillators } from '../Oscillators'
 import PriceChangeAnalysis from '../PriceChangeAnalysis'
 import { initWeights } from './utils'
+import * as util from 'util'
 
 // import * as util from 'util'
 
@@ -95,10 +96,10 @@ class MLTrainer implements IMachineLearningTrainer {
     this.Binance = Binance
   }
 
-  // private show = true
+  private show = true
 
   private trainingExecute = async (): Promise<void> => {
-    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-4)
+    const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-1)
     const now = Date.now() - (1000 * 60 * 10)
 
     let history = {}
@@ -137,21 +138,21 @@ class MLTrainer implements IMachineLearningTrainer {
 
           let techAnalysis: TechAnalysis = this.activePairs[pair].weights.a[interval].a.tech.a
 
-          // if (this.show) {
-          //   // console.log('before techAnalysis = ', pair, interval)
-          //   // console.log(util.inspect(techAnalysis, false, null, true))
-          // }
+          if (this.show) {
+            console.log('before techAnalysis = ', pair, interval)
+            console.log(util.inspect(techAnalysis, false, null, true))
+          }
 
           MLTrainer.MovingAverages(candles, techAnalysis, optimalScore) // moveBack & cross
           MLTrainer.PriceChange(candles, techAnalysis, optimalScore)
           MLTrainer.Oscillators(candles, techAnalysis, optimalScore)
           MLTrainer.CandleSticks(candles, techAnalysis, optimalScore)
 
-          // if (this.show) {
-          //   // console.log('after techAnalysis = ', pair, interval)
-          //   // console.log(util.inspect(techAnalysis, false, null, true))
-          //   this.show = false
-          // }
+          if (this.show) {
+            console.log('after techAnalysis = ', pair, interval)
+            console.log(util.inspect(techAnalysis, false, null, true))
+            this.show = false
+          }
 
         })
         .catch((e) => {
@@ -181,7 +182,7 @@ class MLTrainer implements IMachineLearningTrainer {
 
     // console.log(util.inspect(this.activePairs[participatingPairs[0]], false, null, true))
 
-    if (this.pairsTrained > 1000) {
+    if (this.pairsTrained >= 1440) {
       this.pairsTrained = 0
       this.pairsCorrect = 0
     }
@@ -276,14 +277,14 @@ class MLTrainer implements IMachineLearningTrainer {
       )
       return Binance.getCandlesStockData(
         pair,
-        '1h',
-        15,
+        '15m',
+        20,
         history && history + (1000 * 60 * 10)
       )
     })
     .then((candles: StockData) => {
       return Analysis.getPrevOptimalScore(
-        Analysis.getPrevOptimalSmaScore(candles),
+        Analysis.getPrevOptimalSmaScore(candles, 16),
         optimalScore
       )
     })
@@ -333,30 +334,34 @@ class MLTrainer implements IMachineLearningTrainer {
     // moveBack
     const emaMoveBackTotalWeights = EmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
-      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
-      weight = calcWeight(score ? 0.75 : 0.25, weight, optimalScore)
-      return acc + weight
+      const weight = moveBackDataWeights[MoveBackIdxs[name]].w
+      const preWeight = calcWeight(score ? 0.75 : 0.25, weight, optimalScore)      
+      moveBackDataWeights[MoveBackIdxs[name]].w = preWeight
+      return acc + preWeight
     }, 0)
 
     const smaMoveBackTotalWeights = SmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
-      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
-      weight = calcWeight(score ? 0.75 : 0.25, weight, optimalScore)
-      return acc + weight
+      const weight = moveBackDataWeights[MoveBackIdxs[name]].w
+      const preWeight = calcWeight(score ? 0.75 : 0.25, weight, optimalScore)
+      moveBackDataWeights[MoveBackIdxs[name]].w = preWeight
+      return acc + preWeight
     }, 0)
 
     const emaMoveBackScore = EmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
-      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
-      weight /= emaMoveBackTotalWeights
-      return acc + (score * weight)
+      const preWeight = moveBackDataWeights[MoveBackIdxs[name]].w
+      const newWeight = preWeight / emaMoveBackTotalWeights
+      moveBackDataWeights[MoveBackIdxs[name]].w = newWeight
+      return acc + (score * newWeight)
     }, 0)
 
     const smaMoveBackScore = SmaMoveBackNames.reduce((acc, [name]) => {
       const score = moveBackDataScores[MoveBackIdxs[name]].s
-      let weight = moveBackDataWeights[MoveBackIdxs[name]].w
-      weight /= smaMoveBackTotalWeights
-      return acc + (score * weight)
+      const preWeight = moveBackDataWeights[MoveBackIdxs[name]].w
+      const newWeight = preWeight / smaMoveBackTotalWeights
+      moveBackDataWeights[MoveBackIdxs[name]].w = newWeight
+      return acc + (score * newWeight)
     }, 0)
 
     techAnalysis.moveBack.s = (emaMoveBackScore + smaMoveBackScore) / 2
@@ -399,17 +404,19 @@ class MLTrainer implements IMachineLearningTrainer {
     techAnalysis: TechAnalysis
   ) {
     const oscillatorTotalWeights = OscillatorNames.reduce((acc, name) => {
-      let weight = oscillatorDataWeights[OscillatorIdxs[name]].w
+      const weight = oscillatorDataWeights[OscillatorIdxs[name]].w
       const score = oscillatorDataScores[OscillatorIdxs[name]].s
-      weight = calcWeight(score, weight, optimalScore)
-      return acc + weight
+      const preWeight = calcWeight(score, weight, optimalScore)
+      oscillatorDataWeights[OscillatorIdxs[name]].w = preWeight
+      return acc + preWeight
     }, 0)
 
     techAnalysis.oscillators.s = OscillatorNames.reduce((acc, name) => {
-      let weight = oscillatorDataWeights[OscillatorIdxs[name]].w
+      const weight = oscillatorDataWeights[OscillatorIdxs[name]].w
       const score = oscillatorDataScores[OscillatorIdxs[name]].s
-      weight /= oscillatorTotalWeights
-      return acc + (score * weight)
+      const newWeight = weight / oscillatorTotalWeights
+      oscillatorDataWeights[OscillatorIdxs[name]].w = newWeight
+      return acc + (score * newWeight)
     }, 0)
 
     techAnalysis.oscillators.w = calcWeight(
@@ -489,17 +496,19 @@ class MLTrainer implements IMachineLearningTrainer {
       const levelDataScores: CandleStickLevelSW = candleStickDataScores[level]
 
       const bullishTotalWeights = CandlestickNames.bullish.reduce((acc, name) => {
-        let weight = levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w
         const score = levelDataScores.a.bullish[CandlestickIdxs.bullish[name]].s
-        weight = calcWeight(score ? 0.51 : 0, weight, optimalScore)
-        return acc + weight
+        const weight = levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w
+        const preWeight = calcWeight(score ? 0.51 : 0, weight, optimalScore)
+        levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w = preWeight
+        return acc + preWeight
       }, 0)
 
       const bullishScore = CandlestickNames.bullish.reduce((acc, name) => {
-        let weight = levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w
         const score = levelDataScores.a.bullish[CandlestickIdxs.bullish[name]].s
-        weight /= bullishTotalWeights
-        acc.score += score ? weight * sigmoid(acc.count, CandlestickNames.bullish.length) : 0
+        const preWeight = levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w
+        const newWeight = preWeight / bullishTotalWeights
+        levelDataWeights.a.bullish[CandlestickIdxs.bullish[name]].w = newWeight
+        acc.score += score ? newWeight * sigmoid(acc.count, CandlestickNames.bullish.length) : 0
         acc.count += score
         return acc
       }, {
@@ -508,17 +517,19 @@ class MLTrainer implements IMachineLearningTrainer {
       }).score
 
       const bearishTotalWeights = CandlestickNames.bearish.reduce((acc, name) => {
-        let weight = levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w
         const score = levelDataScores.a.bearish[CandlestickIdxs.bearish[name]].s
-        weight = calcWeight(score ? 0.51 : 0, weight, optimalScore)
-        return acc + weight
+        const weight = levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w
+        const preWeight = calcWeight(score ? 0.51 : 0, weight, optimalScore)
+        levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w = preWeight
+        return acc + preWeight
       }, 0)
 
       const bearishScore = CandlestickNames.bearish.reduce((acc, name) => {
-        let weight = levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w
         const score = levelDataScores.a.bearish[CandlestickIdxs.bearish[name]].s
-        weight /= bearishTotalWeights
-        acc.score += score ? weight * sigmoid(acc.count, CandlestickNames.bearish.length) : 0
+        const preWeight = levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w
+        const newWeight = preWeight / bearishTotalWeights
+        levelDataWeights.a.bearish[CandlestickIdxs.bearish[name]].w = newWeight
+        acc.score += score ? newWeight * sigmoid(acc.count, CandlestickNames.bearish.length) : 0
         acc.count += score
         return acc
       }, {
@@ -591,8 +602,8 @@ class MLTrainer implements IMachineLearningTrainer {
 
     await Promise.all(pairWeightsPromises)
 
-    // this.trainingExecute().catch(console.error)
-    setInterval(this.trainingExecute, 15000)
+    this.trainingExecute().catch(console.error)
+    setInterval(this.trainingExecute, 1000 * 60)
   }
 
 }
