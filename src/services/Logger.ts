@@ -16,7 +16,7 @@ function parseValue(value: any) {
 
 }
 
-const logRow = (data: any[], title: string = '', len: number = 20): void => {
+export const logRow = (data: any[], title: string = '', len: number = 20): void => {
   console.log(data.reduce((acc, value, idx) => {
     const sid = title === '' ? idx : idx + 1
     const cnt = ((sid) * len) - acc.length
