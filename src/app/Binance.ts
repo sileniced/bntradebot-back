@@ -100,8 +100,8 @@ class BinanceApi {
         this.activateTradeBot(user)
       })
 
-      // if (startNow) this.tradeBotExecute()
-      if (startNow) this.tradeBotCollect()
+      if (startNow) this.tradeBotExecute()
+      // if (startNow) this.tradeBotCollect()
 
       setInterval(this.tradeBotExecute, this.settings.globalTradeInterval)
       setInterval(this.tradeBotCollect, this.settings.globalCollectDataInterval)

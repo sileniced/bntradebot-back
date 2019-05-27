@@ -127,7 +127,7 @@ class TradeBot implements ITradeBot {
       this.entity.pricesPairs = pricesPairs
     })
 
-    console.log('this.entity = ', this.entity)
+    // console.log('this.entity = ', this.entity)
 
     this.entity.save().catch(console.error)
   }

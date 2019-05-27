@@ -96,7 +96,7 @@ class MLTrainer implements IMachineLearningTrainer {
     this.Binance = Binance
   }
 
-  private show = true
+  private show = false
 
   private trainingExecute = async (): Promise<void> => {
     const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-1)
