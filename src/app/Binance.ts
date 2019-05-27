@@ -46,6 +46,11 @@ export interface TestOrderResult {
   orderId: string
 }
 
+export const TradeBotSettings = {
+  globalCollectDataInterval: 600000,
+  globalTradeInterval: 1000 * 60 * 60 * 4 /*600000*/ /*10000*/
+}
+
 class BinanceApi {
 
   public api: Binance
@@ -53,10 +58,7 @@ class BinanceApi {
 
   private readonly exchangeInfo: Promise<ExchangeInfo>
 
-  private readonly settings = {
-    globalCollectDataInterval: 600000,
-    globalTradeInterval: 1000 * 60 * 60 * 4 /*600000*/ /*10000*/
-  }
+
 
   private prevPairData: { [pair: string]: PairData } = {}
   // private prevTradeBot: { [userId: number]: TradeBot } = {}
@@ -103,8 +105,8 @@ class BinanceApi {
       if (startNow) this.tradeBotExecute()
       // if (startNow) this.tradeBotCollect()
 
-      setInterval(this.tradeBotExecute, this.settings.globalTradeInterval)
-      setInterval(this.tradeBotCollect, this.settings.globalCollectDataInterval)
+      setInterval(this.tradeBotExecute, TradeBotSettings.globalTradeInterval)
+      setInterval(this.tradeBotCollect, TradeBotSettings.globalCollectDataInterval)
     })
   }
 

@@ -11,7 +11,7 @@ import {
   PairData,
   TechAnalysis
 } from '../../../entities/ScoresWeightsModelV1'
-import BinanceApi from '../../Binance'
+import BinanceApi, { TradeBotSettings } from '../../Binance'
 import StockData from 'technicalindicators/declarations/StockData'
 import Analysis from '../index'
 import PairWeightsEntityV1 from '../../../entities/PairWeightsEntityV1'
@@ -100,7 +100,7 @@ class MLTrainer implements IMachineLearningTrainer {
 
   private trainingExecute = async (): Promise<void> => {
     const selectedPairs = shuffle(Object.keys(this.activePairs)).slice(-1)
-    const now = Date.now() - (1000 * 60 * 10)
+    const now = Date.now() - (TradeBotSettings.globalTradeInterval)
 
     let history = {}
 
@@ -268,7 +268,7 @@ class MLTrainer implements IMachineLearningTrainer {
       pair,
       '5m',
       15,
-      history && history + (1000 * 60 * 10)
+      history && history + (TradeBotSettings.globalTradeInterval)
     ).then((candles: StockData) => {
       const [current, , future] = candles.close.slice(-3)
       optimalScore = Analysis.getPrevOptimalScore(
@@ -279,7 +279,7 @@ class MLTrainer implements IMachineLearningTrainer {
         pair,
         '15m',
         20,
-        history && history + (1000 * 60 * 10)
+        history && history + (TradeBotSettings.globalTradeInterval)
       )
     })
     .then((candles: StockData) => {
